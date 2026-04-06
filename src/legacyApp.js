@@ -156,8 +156,7 @@ export function initializeAppLogic() {
 
     function setPlayIcon(playing) {
         if (!playPauseBtn) return;
-        const i = playPauseBtn.querySelector('i');
-        i.className = playing ? 'ph-fill ph-pause-circle' : 'ph-fill ph-play-circle';
+        playPauseBtn.textContent = playing ? '⏸' : '▶';
     }
 
     // Eventos del audio

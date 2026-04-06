@@ -1305,19 +1305,19 @@ export default function App() {
                 </div>
             </div>
             <div className="player-controls">
-                <button className="ctrl-btn" id="player-prev"><i className="ph ph-skip-back-circle"></i></button>
-                <button className="ctrl-btn play-btn" id="player-playpause"><i className="ph-fill ph-play-circle"></i></button>
-                <button className="ctrl-btn" id="player-next"><i className="ph ph-skip-forward-circle"></i></button>
+                <button className="ctrl-btn" id="player-prev" style={{fontSize:'1.4rem', background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer'}}>⏮</button>
+                <button className="ctrl-btn play-btn" id="player-playpause" style={{fontSize:'2rem', background:'none', border:'none', color:'#f3c948', cursor:'pointer'}}>▶</button>
+                <button className="ctrl-btn" id="player-next" style={{fontSize:'1.4rem', background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer'}}>⏭</button>
             </div>
             <div className="player-timeline">
                 <span className="time current" id="player-current">0:00</span>
-                <div className="progress-bar" id="player-progress-bar">
+                <div className="progress-bar" id="player-progress-bar" style={{cursor:'pointer'}}>
                     <div className="progress" id="player-progress"></div>
                 </div>
                 <span className="time total" id="player-total">0:00</span>
             </div>
             <div className="player-actions">
-                <button className="action-btn" id="player-download"><i className="ph ph-download-simple"></i></button>
+                <button className="action-btn" id="player-download" style={{fontSize:'1.2rem', background:'none', border:'none', color:'rgba(255,255,255,0.5)', cursor:'pointer'}}>⬇</button>
             </div>
         </div>
     </div>
