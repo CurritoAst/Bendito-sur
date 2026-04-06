@@ -1049,8 +1049,11 @@ const CATALOG_FILE = 'catalog.json';
 
 async function loadCatalog(sb) {
     try {
-        const { data: urlData } = sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(CATALOG_FILE);
-        const res = await fetch(urlData.publicUrl + '?t=' + Date.now());
+        // Construir URL pública directamente sin depender del cliente
+        const url = sb
+            ? sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(CATALOG_FILE).data.publicUrl
+            : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${CATALOG_FILE}`;
+        const res = await fetch(url + '?t=' + Date.now());
         if (!res.ok) return [];
         return await res.json();
     } catch { return []; }
@@ -1114,7 +1117,7 @@ function renderAdminCatalogRow(track, sb, allTracks) {
 }
 
 async function initCatalog(supabaseClient) {
-    if (!supabaseClient) return;
+    if (!CONFIG.SUPABASE_URL) return;
 
     // Cargar catálogo desde catalog.json
     const tracks = await loadCatalog(supabaseClient);
