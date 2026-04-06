@@ -1066,6 +1066,9 @@ async function saveCatalog(sb, tracks) {
 
 function renderTrackRow(track) {
     const tbody = document.getElementById('library-tracks-body');
+    if (!tbody) return;
+    // Evitar duplicados
+    if (tbody.querySelector(`tr[data-id="${track.id}"]`)) return;
     const emptyRow = document.getElementById('library-empty-row');
     if (emptyRow) emptyRow.remove();
     const tr = document.createElement('tr');
@@ -1074,17 +1077,17 @@ function renderTrackRow(track) {
     tr.setAttribute('data-artist', track.artist);
     tr.setAttribute('data-src', track.audio_url);
     tr.setAttribute('data-id', track.id);
+    const downloadBtn = track.locked
+        ? `<button class="btn-icon" title="Solo Elite" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 8px;color:#f3c948;font-size:0.75rem;letter-spacing:1px;cursor:pointer">ELITE</button>`
+        : `<button class="btn-icon" title="Descargar WAV" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 10px;color:#fff;font-size:0.8rem;letter-spacing:1px;cursor:pointer">⬇ WAV</button>`;
     tr.innerHTML = `
-        <td><button class="track-play-btn"><i class="ph-fill ph-play-circle"></i></button></td>
+        <td><button class="track-play-btn" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:1.5rem">▶</button></td>
         <td class="font-medium">${track.title}</td>
         <td class="text-secondary">${track.artist}</td>
         <td><span class="genre-tag">${track.genre || '—'}</span></td>
         <td class="text-secondary">${track.bpm || '—'}</td>
         <td class="text-secondary">${track.key || '—'}</td>
-        <td>${track.locked
-            ? '<button class="btn-icon locked" title="Solo Elite" style="color:#f3c948;font-size:1.2rem"><i class="ph-fill ph-lock-key"></i></button>'
-            : '<button class="btn-icon" title="Descargar WAV" style="color:#fff;font-size:1.2rem"><i class="ph ph-download-simple"></i></button>'
-        }</td>`;
+        <td>${downloadBtn}</td>`;
     if (tbody) tbody.appendChild(tr);
 }
 
