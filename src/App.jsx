@@ -231,7 +231,6 @@ export default function App() {
                             </div>
 
                             <button type="submit" className="btn btn-primary w-100 btn-lg">Entrar al Club</button>
-                            <p className="auth-hint">Demo Root: <span className="text-gold">admin@benditosur.es</span> / <span className="text-gold">admin123</span><br />Demo Colaborador: <span className="text-gold">collab@benditosur.es</span> / <span className="text-gold">collab</span></p>
                         </form>
 
                         
