@@ -60,11 +60,32 @@ export default function App() {
             lockLogo.addEventListener('click', handleUnlockTap);
         }
 
-        // Botón visible de acceso
+        // Botón visible de acceso con contraseña
         const lockBtn = document.getElementById('site-lock-btn');
+        const lockPassword = document.getElementById('site-lock-password');
+        const LOCK_PASSWORD = 'benditosur2024';
+
+        const tryUnlock = () => {
+            if (lockPassword && lockPassword.value === LOCK_PASSWORD) {
+                unlock();
+            } else if (lockHint) {
+                lockHint.style.opacity = '1';
+                if (lockPassword) {
+                    lockPassword.style.borderColor = 'rgba(231,76,60,0.6)';
+                    setTimeout(() => {
+                        lockPassword.style.borderColor = 'rgba(247,168,0,0.3)';
+                        lockHint.style.opacity = '0';
+                    }, 2000);
+                }
+            }
+        };
+
         if (lockBtn) {
-            lockBtn.addEventListener('click', unlock);
-            lockBtn.addEventListener('touchend', (e) => { e.preventDefault(); unlock(); });
+            lockBtn.addEventListener('click', tryUnlock);
+            lockBtn.addEventListener('touchend', (e) => { e.preventDefault(); tryUnlock(); });
+        }
+        if (lockPassword) {
+            lockPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
         }
 
         // Ejecutar lógica antigua sobre el DOM una vez montado
@@ -102,14 +123,26 @@ export default function App() {
                     <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.6', fontStyle: 'italic' }}>
                         Dentro de poco sabréis muchas cosas...
                     </p>
+                    <input
+                        id="site-lock-password"
+                        type="password"
+                        placeholder="Contraseña"
+                        style={{
+                            width: '100%', padding: '0.75rem 1rem', marginBottom: '0.75rem',
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(247,168,0,0.3)',
+                            borderRadius: '2px', color: '#fff', fontSize: '1rem',
+                            letterSpacing: '2px', outline: 'none', boxSizing: 'border-box',
+                            fontFamily: 'inherit'
+                        }}
+                    />
                     <button id="site-lock-btn" style={{
-                        marginTop: '1rem', width: '100%', padding: '0.85rem 1.5rem',
+                        width: '100%', padding: '0.85rem 1.5rem',
                         background: 'transparent', border: '1px solid rgba(247,168,0,0.4)',
                         color: '#f7a800', fontFamily: 'Bebas Neue, sans-serif',
                         fontSize: '1.1rem', letterSpacing: '4px', cursor: 'pointer',
                         borderRadius: '2px', transition: 'all 0.2s'
                     }}>ACCEDER →</button>
-                    <p id="site-lock-hint" style={{ color: 'rgba(247,168,0,0.6)', fontSize: '0.7rem', marginTop: '0.75rem', letterSpacing: '1px', opacity: 0, transition: 'opacity 0.2s', minHeight: '1.2em' }}></p>
+                    <p id="site-lock-hint" style={{ color: '#e74c3c', fontSize: '0.75rem', marginTop: '0.75rem', letterSpacing: '1px', opacity: 0, transition: 'opacity 0.2s', minHeight: '1.2em' }}>Contraseña incorrecta</p>
                     <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '0.75rem', letterSpacing: '1px' }}>
                         Solo personal autorizado · benditosur.es
                     </p>
