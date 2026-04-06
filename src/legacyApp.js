@@ -1079,8 +1079,8 @@ function renderTrackRow(track) {
         <td class="text-secondary">${track.bpm || '—'}</td>
         <td class="text-secondary">${track.key || '—'}</td>
         <td>${track.locked
-            ? '<button class="btn-icon locked" title="Solo Elite" style="color:rgba(243,201,72,0.4)"><i class="ph-fill ph-lock-key"></i></button>'
-            : '<button class="btn-icon" title="Descargar WAV" style="color:rgba(255,255,255,0.6)"><i class="ph ph-download-simple"></i></button>'
+            ? '<button class="btn-icon locked" title="Solo Elite" style="color:#f3c948;font-size:1.2rem"><i class="ph-fill ph-lock-key"></i></button>'
+            : '<button class="btn-icon" title="Descargar WAV" style="color:#fff;font-size:1.2rem"><i class="ph ph-download-simple"></i></button>'
         }</td>`;
     if (tbody) tbody.appendChild(tr);
 }
