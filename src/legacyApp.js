@@ -1027,5 +1027,150 @@ export function initializeAppLogic() {
         });
     }
 
+    // 13. CATÁLOGO — Subida de pistas y carga de biblioteca
+    initCatalog(supabaseClient);
+}
+
+// ─── CATALOG SYSTEM ──────────────────────────────────────────────────────────
+
+function renderTrackRow(track) {
+    // Añade fila a la biblioteca pública
+    const tbody = document.getElementById('library-tracks-body');
+    const emptyRow = document.getElementById('library-empty-row');
+    if (emptyRow) emptyRow.remove();
+
+    const tr = document.createElement('tr');
+    tr.className = 'track-row';
+    tr.setAttribute('data-title', track.title);
+    tr.setAttribute('data-artist', track.artist);
+    tr.setAttribute('data-src', track.audio_url);
+    tr.setAttribute('data-id', track.id);
+    tr.innerHTML = `
+        <td><button class="track-play-btn"><i class="ph-fill ph-play-circle"></i></button></td>
+        <td class="font-medium">${track.title}</td>
+        <td class="text-secondary">${track.artist}</td>
+        <td><span class="genre-tag">${track.genre || '—'}</span></td>
+        <td class="text-secondary">${track.bpm || '—'}</td>
+        <td class="text-secondary">${track.key || '—'}</td>
+        <td>${track.locked
+            ? '<button class="btn-icon locked" title="Requiere Suscripcion"><i class="ph-fill ph-lock-key"></i></button>'
+            : '<button class="btn-icon" title="Descargar WAV"><i class="ph ph-download-simple"></i></button>'
+        }</td>
+    `;
+    if (tbody) tbody.appendChild(tr);
+}
+
+function renderAdminCatalogRow(track, supabaseClient) {
+    const tbody = document.getElementById('admin-catalog-tbody');
+    const emptyRow = document.getElementById('admin-catalog-empty');
+    if (emptyRow) emptyRow.remove();
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-id', track.id);
+    tr.innerHTML = `
+        <td class="font-medium">${track.title}</td>
+        <td class="text-secondary">${track.artist}</td>
+        <td><span class="genre-tag">${track.genre || '—'}</span></td>
+        <td class="text-secondary">${track.bpm || '—'}</td>
+        <td class="text-secondary">${track.key || '—'}</td>
+        <td>${track.locked ? '<span class="format-badge">Elite</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Libre</span>'}</td>
+        <td><button class="btn-icon delete-track-btn" title="Eliminar" style="color:var(--red)"><i class="ph ph-trash"></i></button></td>
+    `;
+    tr.querySelector('.delete-track-btn').addEventListener('click', async () => {
+        BSConfirm('¿Eliminar esta pista del catálogo?').then(async ok => {
+            if (!ok) return;
+            if (supabaseClient) {
+                await supabaseClient.from('tracks').delete().eq('id', track.id);
+            }
+            // Quitar de admin y de biblioteca
+            tr.remove();
+            const libRow = document.querySelector(`.track-row[data-id="${track.id}"]`);
+            if (libRow) libRow.remove();
+            BSAlert('✅ Pista eliminada del catálogo.');
+        });
+    });
+    if (tbody) tbody.appendChild(tr);
+}
+
+async function initCatalog(supabaseClient) {
+    // Cargar pistas existentes desde Supabase
+    if (supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient.from('tracks').select('*').order('created_at', { ascending: false });
+            if (!error && data) {
+                data.forEach(track => {
+                    renderTrackRow(track);
+                    renderAdminCatalogRow(track, supabaseClient);
+                });
+            }
+        } catch (e) { /* Supabase no conectado */ }
+    }
+
+    // Formulario de subida
+    const form = document.getElementById('upload-track-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('upload-track-btn');
+        const fileInput = document.getElementById('track-file-input');
+        const file = fileInput.files[0];
+        const title = document.getElementById('track-title').value.trim();
+        const artist = document.getElementById('track-artist').value.trim();
+
+        if (!file) { BSAlert('⚠️ Selecciona un archivo de audio.'); return; }
+        if (!title || !artist) { BSAlert('⚠️ Título y artista son obligatorios.'); return; }
+
+        const genre = document.getElementById('track-genre').value.trim();
+        const bpm = document.getElementById('track-bpm').value.trim();
+        const key = document.getElementById('track-key').value.trim();
+        const locked = document.getElementById('track-locked').value === 'true';
+
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Subiendo...';
+        btn.disabled = true;
+
+        if (!supabaseClient) {
+            BSAlert('⚠️ Supabase no está configurado.\nConecta tu proyecto en el archivo .env para subir pistas a la nube.');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            return;
+        }
+
+        try {
+            // 1. Subir archivo a Storage
+            const filePath = `tracks/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const { error: uploadError } = await supabaseClient.storage
+                .from(CONFIG.STORAGE_BUCKET)
+                .upload(filePath, file, { upsert: false });
+            if (uploadError) throw uploadError;
+
+            // 2. Obtener URL pública
+            const { data: urlData } = supabaseClient.storage
+                .from(CONFIG.STORAGE_BUCKET)
+                .getPublicUrl(filePath);
+            const audioUrl = urlData.publicUrl;
+
+            // 3. Guardar metadatos en tabla `tracks`
+            const { data: inserted, error: insertError } = await supabaseClient
+                .from('tracks')
+                .insert([{ title, artist, genre, bpm: bpm || null, key: key || null, locked, audio_url: audioUrl }])
+                .select()
+                .single();
+            if (insertError) throw insertError;
+
+            // 4. Renderizar en biblioteca y en admin
+            renderTrackRow(inserted);
+            renderAdminCatalogRow(inserted, supabaseClient);
+
+            BSAlert(`✅ "${title}" subida al catálogo correctamente.`);
+            form.reset();
+        } catch (err) {
+            BSAlert('❌ Error al subir: ' + err.message);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
 }
 
