@@ -950,9 +950,11 @@ export function initializeAppLogic() {
 
     // Inicializamos cliente Supabase de forma global para estas funciones
     let supabaseClient = null;
-    if (window.supabase && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_URL !== '') {
-        supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-    }
+    try {
+        if (window.supabase && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_URL !== '') {
+            supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        }
+    } catch(e) { console.warn('Supabase init failed:', e.message); }
 
     if (collabExportBtn) {
         collabExportBtn.addEventListener('click', async () => {

@@ -89,7 +89,7 @@ export default function App() {
         }
 
         // Ejecutar lógica antigua sobre el DOM una vez montado
-        initializeAppLogic();
+        try { initializeAppLogic(); } catch(e) { console.error('App init error:', e); }
 
         // Auto-refresco cada 5 minutos
         const refreshInterval = setInterval(() => {
