@@ -3,6 +3,8 @@
  */
 
 
+import { CONFIG } from './config.js';
+
 export function initializeAppLogic() {
     // 1. Navigation Logic (SPA Routing)
     const navItems = document.querySelectorAll('.nav-item');
@@ -779,7 +781,7 @@ export function initializeAppLogic() {
 
     // Inicializamos cliente Supabase de forma global para estas funciones
     let supabaseClient = null;
-    if (window.supabase && typeof CONFIG !== 'undefined' && CONFIG.SUPABASE_URL !== 'TU_SUPABASE_URL_AQUI') {
+    if (window.supabase && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_URL !== '') {
         supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
     }
 
