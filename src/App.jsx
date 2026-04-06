@@ -60,6 +60,13 @@ export default function App() {
             lockLogo.addEventListener('click', handleUnlockTap);
         }
 
+        // Botón visible de acceso
+        const lockBtn = document.getElementById('site-lock-btn');
+        if (lockBtn) {
+            lockBtn.addEventListener('click', unlock);
+            lockBtn.addEventListener('touchend', (e) => { e.preventDefault(); unlock(); });
+        }
+
         // Ejecutar lógica antigua sobre el DOM una vez montado
         initializeAppLogic();
     }, []);
@@ -88,8 +95,15 @@ export default function App() {
                     <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.6', fontStyle: 'italic' }}>
                         Dentro de poco sabréis muchas cosas...
                     </p>
-                    <p id="site-lock-hint" style={{ color: 'rgba(247,168,0,0.6)', fontSize: '0.7rem', marginTop: '0.5rem', letterSpacing: '1px', opacity: 0, transition: 'opacity 0.2s', minHeight: '1.2em' }}></p>
-                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', marginTop: '0.5rem', letterSpacing: '1px' }}>
+                    <button id="site-lock-btn" style={{
+                        marginTop: '1rem', width: '100%', padding: '0.85rem 1.5rem',
+                        background: 'transparent', border: '1px solid rgba(247,168,0,0.4)',
+                        color: '#f7a800', fontFamily: 'Bebas Neue, sans-serif',
+                        fontSize: '1.1rem', letterSpacing: '4px', cursor: 'pointer',
+                        borderRadius: '2px', transition: 'all 0.2s'
+                    }}>ACCEDER →</button>
+                    <p id="site-lock-hint" style={{ color: 'rgba(247,168,0,0.6)', fontSize: '0.7rem', marginTop: '0.75rem', letterSpacing: '1px', opacity: 0, transition: 'opacity 0.2s', minHeight: '1.2em' }}></p>
+                    <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '0.75rem', letterSpacing: '1px' }}>
                         Solo personal autorizado · benditosur.es
                     </p>
                 </div>
