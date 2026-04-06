@@ -149,9 +149,41 @@ export default function App() {
                 </div>
             </div>
 
-            
+            {/* === MODAL CUSTOM === */}
+            <div id="bs-modal-overlay" style={{
+                position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                background: 'rgba(0,0,0,0.75)', zIndex: 999999,
+                display: 'none', alignItems: 'center', justifyContent: 'center',
+                backdropFilter: 'blur(4px)', padding: '1rem'
+            }}>
+                <div id="bs-modal-box" style={{
+                    background: '#0d0d0d', border: '1px solid rgba(243,201,72,0.25)',
+                    borderRadius: '8px', padding: '2.5rem 2rem', maxWidth: '420px', width: '100%',
+                    textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.8)'
+                }}>
+                    <div id="bs-modal-icon" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}></div>
+                    <p id="bs-modal-message" style={{
+                        color: 'rgba(255,255,255,0.85)', fontSize: '0.95rem',
+                        lineHeight: '1.6', marginBottom: '2rem', whiteSpace: 'pre-line'
+                    }}></p>
+                    <div id="bs-modal-actions" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                        <button id="bs-modal-cancel" style={{
+                            display: 'none', padding: '0.7rem 1.5rem',
+                            background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+                            color: 'rgba(255,255,255,0.5)', borderRadius: '3px', cursor: 'pointer',
+                            fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '2px'
+                        }}>CANCELAR</button>
+                        <button id="bs-modal-ok" style={{
+                            padding: '0.7rem 2rem',
+                            background: '#f3c948', border: 'none', color: '#000',
+                            borderRadius: '3px', cursor: 'pointer',
+                            fontFamily: 'Bebas Neue, sans-serif', fontSize: '1rem', letterSpacing: '2px',
+                            fontWeight: '700'
+                        }}>ACEPTAR</button>
+                    </div>
+                </div>
+            </div>
 
-    
     <nav className="navbar">
         <div className="nav-container">
             <div className="logo">
@@ -1118,7 +1150,7 @@ export default function App() {
                                             <td style={{ "color": "var(--red)", "fontWeight": "bold" }}>4 dispositivos</td>
                                             <td className="text-secondary">Sevilla, Madrid, Barcelona</td>
                                             <td><span className="status-badge" style={{ "background": "var(--red)", "color": "white", "border": "none" }}>Riesgo Alto</span></td>
-                                            <td><button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--red)", "color": "var(--red)" }} onclick="alert('Sesiones revocadas y usuario notificado.')">Revocar</button></td>
+                                            <td><button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--red)", "color": "var(--red)" }} onClick={() => BSAlert('✅ Sesiones revocadas y usuario notificado.')}>Revocar</button></td>
                                         </tr>
                                         <tr>
                                             <td className="font-medium">alex.under@hotmail.com</td>
@@ -1134,7 +1166,7 @@ export default function App() {
                                             <td className="text-secondary" style={{ "color": "var(--gold)" }}>2 dispositivos</td>
                                             <td className="text-secondary">Granada, Almería</td>
                                             <td><span className="status-badge" style={{ "background": "var(--gold)", "color": "var(--bg)", "border": "none" }}>Sospechoso</span></td>
-                                            <td><button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--gold)", "color": "var(--gold)" }} onclick="alert('Iniciando verificación extra de identidad.')">Verificar</button></td>
+                                            <td><button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--gold)", "color": "var(--gold)" }} onClick={() => BSAlert('🔒 Iniciando verificación extra de identidad.')}>Verificar</button></td>
                                         </tr>
                                     </tbody>
                                 </table>

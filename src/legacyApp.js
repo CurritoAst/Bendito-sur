@@ -5,6 +5,37 @@
 
 import { CONFIG } from './config.js';
 
+// === MODAL SYSTEM ===
+
+function _bsShowModal(message, icon, isConfirm) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('bs-modal-overlay');
+        if (!overlay) { resolve(isConfirm ? window.confirm(message) : (window.alert(message), undefined)); return; }
+        const iconEl = document.getElementById('bs-modal-icon');
+        const msgEl = document.getElementById('bs-modal-message');
+        const okBtn = document.getElementById('bs-modal-ok');
+        const cancelBtn = document.getElementById('bs-modal-cancel');
+        // Auto-detect icon from leading emoji
+        const emojiMatch = message.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s?/u);
+        iconEl.textContent = icon || (emojiMatch ? emojiMatch[1] : 'ℹ️');
+        msgEl.textContent = emojiMatch ? message.slice(emojiMatch[0].length) : message;
+        cancelBtn.style.display = isConfirm ? 'inline-block' : 'none';
+        overlay.style.display = 'flex';
+        const onOk = () => { overlay.style.display = 'none'; cleanup(); resolve(true); };
+        const onCancel = () => { overlay.style.display = 'none'; cleanup(); resolve(false); };
+        const cleanup = () => { okBtn.removeEventListener('click', onOk); cancelBtn.removeEventListener('click', onCancel); };
+        okBtn.addEventListener('click', onOk);
+        if (isConfirm) cancelBtn.addEventListener('click', onCancel);
+    });
+}
+
+function BSAlert(message) { return _bsShowModal(message, null, false); }
+function BSConfirm(message) { return _bsShowModal(message, '⚠️', true); }
+
+// Exponer globalmente para uso en JSX inline
+/** @type {any} */ (window).BSAlert = BSAlert;
+/** @type {any} */ (window).BSConfirm = BSConfirm;
+
 export function initializeAppLogic() {
     // 1. Navigation Logic (SPA Routing)
     const navItems = document.querySelectorAll('.nav-item');
@@ -168,7 +199,7 @@ export function initializeAppLogic() {
 
                 if (!community && !style) msg = 'Mostrando todos los eventos';
 
-                alert(msg);
+                BSAlert(msg);
             }, 800);
         });
     }
@@ -432,7 +463,7 @@ export function initializeAppLogic() {
     document.querySelectorAll('.auth-btn-logout, #admin-logout-btn').forEach(btn => btn.addEventListener('click', (e) => {
         e.preventDefault();
         UserSession.clear();
-        alert('Sesión cerrada correctamente.');
+        BSAlert('✅ Sesión cerrada correctamente.');
         document.querySelectorAll('.view, .nav-item').forEach(v => v.classList.remove('active'));
         const homeNav = document.querySelector('.nav-item[data-target="home-view"]');
         if(homeNav) homeNav.classList.add('active');
@@ -477,12 +508,12 @@ export function initializeAppLogic() {
                     UserSession.set('admin');
                     const view = document.getElementById('admin-view');
                     if(view) view.classList.add('active');
-                    alert('🔓 Acceso concedido al panel del Administrador.');
+                    BSAlert('🔓 Acceso concedido al panel del Administrador.');
                 } else if (email === 'collab@benditosur.es' && pass === 'collab') {
                     UserSession.set('collab');
                     const view = document.getElementById('dashboard-view');
                     if(view) view.classList.add('active');
-                    alert('👑 Acceso vitalicio completado. Bienvenido, Colaborador Permanente.');
+                    BSAlert('👑 Acceso vitalicio completado. Bienvenido, Colaborador Permanente.');
                 } else {
                     UserSession.set('user');
                     const view = document.getElementById('dashboard-view');
@@ -519,7 +550,7 @@ export function initializeAppLogic() {
                 submitBtn.style.pointerEvents = 'auto';
                 
                 UserSession.set('user');
-                alert('✅ ¡Cuenta creada con éxito! Ya puedes escuchar lo mejor del sur.');
+                BSAlert('✅ ¡Cuenta creada con éxito! Ya puedes escuchar lo mejor del sur.');
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
                 
                 const view = document.getElementById('dashboard-view');
@@ -575,10 +606,12 @@ export function initializeAppLogic() {
             
             // Si es un botón de cancelar, mostramos confirmación
             if (btn.textContent.includes('Cancelar')) {
-                if(confirm('¿Estás seguro de que deseas cancelar tu suscripción?')) {
-                    alert('Suscripción cancelada.');
-                    btn.closest('.dashboard-card').style.opacity = '0.5';
-                }
+                BSConfirm('¿Estás seguro de que deseas cancelar tu suscripción?').then(ok => {
+                    if (ok) {
+                        BSAlert('✅ Suscripción cancelada.');
+                        btn.closest('.dashboard-card').style.opacity = '0.5';
+                    }
+                });
                 return;
             }
 
@@ -591,9 +624,9 @@ export function initializeAppLogic() {
                 btn.style.pointerEvents = 'auto';
                 
                 if (btn.textContent.includes('Entradas')) {
-                    alert('🎟️ Ticket reservado temporalmente. Te redirigiremos al pago. (Simulación)');
+                    BSAlert('🎟️ Ticket reservado temporalmente. Te redirigiremos al pago. (Simulación)');
                 } else if (btn.textContent.includes('Pro') || btn.textContent.includes('Elite')) {
-                    alert('💳 Redirigiendo a la pasarela segura de pago para procesar la suscripción.');
+                    BSAlert('💳 Redirigiendo a la pasarela segura de pago para procesar la suscripción.');
                 } else if (btn.textContent.includes('Cambiar')) {
                     document.querySelector('[data-target="pricing-view"]').click();
                 }
@@ -609,20 +642,20 @@ export function initializeAppLogic() {
             // Verificamos si hay sesión
             const role = UserSession.get();
             if (!role) {
-                alert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
+                BSAlert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
                 // Enviar al registro
                 document.querySelector('.auth-btn-register').click();
                 return;
             }
 
             if (btn.classList.contains('locked') && role !== 'collab' && role !== 'admin') {
-                alert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
+                BSAlert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
                 document.querySelector('[data-target="pricing-view"]').click();
                 return;
             }
             
             if (btn.textContent.includes('Presskit') || btn.title.toLowerCase().includes('descargar')) {
-                alert('⬇️ Se ha iniciado la descarga del archivo en tu explorador... (Simulación)');
+                BSAlert('⬇️ Se ha iniciado la descarga del archivo en tu explorador... (Simulación)');
             }
         });
     });
@@ -677,16 +710,16 @@ export function initializeAppLogic() {
                         // Verificamos si hay sesión
                         const role = UserSession.get();
                         if (!role) {
-                            alert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
+                            BSAlert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
                             document.querySelector('.auth-btn-register').click();
                             return;
                         }
 
                         if (btn.classList.contains('locked') && role !== 'collab' && role !== 'admin') {
-                            alert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
+                            BSAlert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
                             document.querySelector('[data-target="pricing-view"]').click();
                         } else {
-                            alert('⬇️ Se ha iniciado la descarga del archivo... (Simulación)');
+                            BSAlert('⬇️ Se ha iniciado la descarga del archivo... (Simulación)');
                         }
                     });
                 });
@@ -769,7 +802,7 @@ export function initializeAppLogic() {
         btnExport.addEventListener('click', () => {
             const checkedBoxes = document.querySelectorAll('.admin-track-select:checked');
             if (checkedBoxes.length === 0) {
-                alert('⚠️ Selecciona al menos una pista para exportar.');
+                BSAlert('⚠️ Selecciona al menos una pista para exportar.');
                 return;
             }
             
@@ -780,7 +813,7 @@ export function initializeAppLogic() {
             setTimeout(() => {
                 btnExport.innerHTML = originalText;
                 btnExport.disabled = false;
-                alert(`✅ Se han empaquetado y comenzado a descargar ${checkedBoxes.length} archivos (.zip). (Simulación)`);
+                BSAlert(`✅ Se han empaquetado y comenzado a descargar ${checkedBoxes.length} archivos (.zip). (Simulación)`);
                 adminCheckboxes.forEach(cb => cb.checked = false);
                 if(adminSelectAll) adminSelectAll.checked = false;
                 updateExportCount();
@@ -800,7 +833,7 @@ export function initializeAppLogic() {
             setTimeout(() => {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                alert('📩 Invitación VIP enviada con éxito. El usuario recibirá un enlace para activar su acceso vitalicio gratuito.');
+                BSAlert('📩 Invitación VIP enviada con éxito. El usuario recibirá un enlace para activar su acceso vitalicio gratuito.');
                 inviteForm.reset();
             }, 1000);
         });
@@ -820,7 +853,7 @@ export function initializeAppLogic() {
     if (collabExportBtn) {
         collabExportBtn.addEventListener('click', async () => {
             if (!supabaseClient) {
-                alert('⚠️ Backend no conectado.\nPara que el botón se comunique de verdad con la nube, reemplaza los datos en config.js con los de tu proyecto Supabase.');
+                BSAlert('⚠️ Backend no conectado.\nPara que el botón se comunique de verdad con la nube, reemplaza los datos en config.js con los de tu proyecto Supabase.');
                 return;
             }
 
@@ -834,14 +867,14 @@ export function initializeAppLogic() {
                 if (error) throw error;
 
                 if (!data || data.length === 0) {
-                    alert('📦 No se encontraron pistas asociadas a este catálogo en la nube.');
+                    BSAlert('📦 No se encontraron pistas asociadas a este catálogo en la nube.');
                 } else {
                     const fileNames = data.map(f => f.name).join('\n - ');
-                    alert(`📦 Conexión OK. Tienes ${data.length} archivos en la nube:\n\n - ${fileNames}\n\n(Para exportar un .zip se requerirá usar Supabase Edge Functions).`);
+                    BSAlert(`📦 Conexión OK. Tienes ${data.length} archivos en la nube:\n\n - ${fileNames}\n\n(Para exportar un .zip se requerirá usar Supabase Edge Functions).`);
                 }
             } catch (err) {
                 console.error(err);
-                alert('❌ Error descargando metadatos: ' + err.message);
+                BSAlert('❌ Error descargando metadatos: ' + err.message);
             } finally {
                 collabExportBtn.innerHTML = originalText;
                 collabExportBtn.disabled = false;
@@ -860,7 +893,7 @@ export function initializeAppLogic() {
             if (!file) return;
 
             if (!supabaseClient) {
-                alert(`⚠️ (Simulación Local) Archivo físico "${file.name}" seleccionado desde tu PC correctamente.\nPara subirlo dinámicamente a la nube, completa los datos en config.js.`);
+                BSAlert(`⚠️ (Simulación Local) Archivo físico "${file.name}" seleccionado desde tu PC correctamente.\nPara subirlo dinámicamente a la nube, completa los datos en config.js.`);
                 return;
             }
 
@@ -872,16 +905,16 @@ export function initializeAppLogic() {
             
             try {
                 // Subida real a Supabase Storage
-                const { data, error } = await supabaseClient.storage
+                const { error } = await supabaseClient.storage
                     .from(CONFIG.STORAGE_BUCKET)
                     .upload(filePath, file);
                 
                 if (error) throw error;
                 
-                alert(`✅ ¡Aporte Exclusivo Guardado!\nEl archivo "${file.name}" se subió físicamente a tu servidor nube (Supabase).`);
+                BSAlert(`✅ ¡Aporte Exclusivo Guardado!\nEl archivo "${file.name}" se subió físicamente a tu servidor nube (Supabase).`);
             } catch (err) {
                 console.error(err);
-                alert('❌ Falló la subida real a la nube: ' + err.message);
+                BSAlert('❌ Falló la subida real a la nube: ' + err.message);
             } finally {
                 collabImportBtn.innerHTML = originalText;
                 collabImportBtn.disabled = false;
