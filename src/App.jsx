@@ -5,36 +5,23 @@ import { initializeAppLogic } from './legacyApp.js';
 
 export default function App() {
     useEffect(() => {
-        // Pantalla de bloqueo
+        // Pantalla de bloqueo — se desbloquea con Ctrl+Shift+9
         const lockOverlay = document.getElementById('site-lock-overlay');
-        const lockForm = document.getElementById('site-lock-form');
-        const lockInput = document.getElementById('site-lock-password');
-        const lockError = document.getElementById('site-lock-error');
-        const ADMIN_KEY = 'benditosur2024';
 
-        // Comprobar si ya fue desbloqueado en esta sesión
         if (sessionStorage.getItem('bs_unlocked') === 'true') {
             if (lockOverlay) lockOverlay.style.display = 'none';
         }
 
-        if (lockForm) {
-            lockForm.addEventListener('submit', (e) => {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === '9') {
                 e.preventDefault();
-                if (lockInput.value === ADMIN_KEY) {
-                    sessionStorage.setItem('bs_unlocked', 'true');
+                sessionStorage.setItem('bs_unlocked', 'true');
+                if (lockOverlay) {
                     lockOverlay.style.opacity = '0';
                     setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
-                } else {
-                    lockError.textContent = 'Clave incorrecta';
-                    lockInput.value = '';
-                    lockInput.style.borderColor = '#c02830';
-                    setTimeout(() => {
-                        lockError.textContent = '';
-                        lockInput.style.borderColor = 'rgba(255,255,255,0.15)';
-                    }, 2000);
                 }
-            });
-        }
+            }
+        });
 
         // Ejecutar lógica antigua sobre el DOM una vez montado
         initializeAppLogic();
@@ -61,31 +48,10 @@ export default function App() {
                         fontSize: '0.7rem', letterSpacing: '4px', textTransform: 'uppercase',
                         color: '#f7a800', marginBottom: '1.5rem', fontWeight: 600
                     }}>🔒 Plataforma en Desarrollo</div>
-                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2.5rem', lineHeight: '1.6', fontStyle: 'italic' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.6', fontStyle: 'italic' }}>
                         Dentro de poco sabréis muchas cosas...
                     </p>
-                    <form id="site-lock-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <input
-                            type="password"
-                            id="site-lock-password"
-                            placeholder="Introduce la clave de acceso"
-                            autoFocus
-                            style={{
-                                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)',
-                                color: '#fff', padding: '1rem', borderRadius: '6px', outline: 'none',
-                                fontSize: '0.95rem', textAlign: 'center', letterSpacing: '3px',
-                                transition: 'border-color 0.3s'
-                            }}
-                        />
-                        <button type="submit" style={{
-                            background: '#f7a800', color: '#000', border: 'none', padding: '0.9rem',
-                            borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem',
-                            letterSpacing: '2px', textTransform: 'uppercase', cursor: 'pointer',
-                            transition: 'opacity 0.2s'
-                        }}>Acceder</button>
-                        <p id="site-lock-error" style={{ color: '#c02830', fontSize: '0.8rem', margin: 0, minHeight: '1.2rem' }}></p>
-                    </form>
-                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', marginTop: '2rem', letterSpacing: '1px' }}>
+                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', marginTop: '1rem', letterSpacing: '1px' }}>
                         Solo personal autorizado · benditosur.es
                     </p>
                 </div>
