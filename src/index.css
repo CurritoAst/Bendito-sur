@@ -205,15 +205,24 @@ main { padding-top: 64px; min-height: 100vh; }
 
 /* ── Marquee ─────────────────────────────── */
 .sur-strip {
+    /* clip-path en vez de overflow:hidden — evita bug de iOS Safari
+       donde overflow:hidden en body rompe translateX animations */
+    clip-path: inset(0);
     overflow: hidden;
     padding: 0.65rem 0;
     border-bottom: 1px solid var(--border);
     background: var(--bg-alt);
+    width: 100%;
 }
 .sur-strip-inner {
-    display: inline-flex; gap: 3rem;
-    animation: marquee 22s linear infinite;
+    display: flex;
+    width: max-content;
+    gap: 3rem;
     white-space: nowrap;
+    will-change: transform;
+    transform: translateZ(0);
+    animation: marquee 22s linear infinite;
+    -webkit-animation: marquee 22s linear infinite;
 }
 .sur-strip span {
     font-family: var(--font-display);
@@ -225,6 +234,10 @@ main { padding-top: 64px; min-height: 100vh; }
 @keyframes marquee {
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }
+}
+@-webkit-keyframes marquee {
+    from { -webkit-transform: translateX(0); }
+    to   { -webkit-transform: translateX(-50%); }
 }
 
 /* =========================================
