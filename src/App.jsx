@@ -69,6 +69,13 @@ export default function App() {
 
         // Ejecutar lógica antigua sobre el DOM una vez montado
         initializeAppLogic();
+
+        // Auto-refresco cada 5 minutos
+        const refreshInterval = setInterval(() => {
+            window.location.reload();
+        }, 5 * 60 * 1000);
+
+        return () => clearInterval(refreshInterval);
     }, []);
 
     return (
