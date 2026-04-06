@@ -1141,7 +1141,11 @@ async function initCatalog(supabaseClient) {
 
         try {
             // 1. Subir archivo a Storage
-            const filePath = `tracks/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const safeName = file.name
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // quitar acentos
+                .replace(/[^a-zA-Z0-9._-]/g, '_')                  // solo caracteres seguros
+                .replace(/_+/g, '_');                               // colapsar guiones bajos
+            const filePath = `tracks/${Date.now()}_${safeName}`;
             const { error: uploadError } = await supabaseClient.storage
                 .from(CONFIG.STORAGE_BUCKET)
                 .upload(filePath, file, { upsert: false });
