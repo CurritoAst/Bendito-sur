@@ -739,29 +739,38 @@ export function initializeAppLogic() {
     });
 
     // Botones de descarga (Presskit y pistas WAV/FLAC)
-    document.querySelectorAll('.dj-link, .library-table .btn-icon').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
+    // Delegación para botones de descarga (incluye filas dinámicas)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.library-table .btn-icon, .dj-link');
+        if (!btn) return;
+        e.preventDefault();
 
-            // Verificamos si hay sesión
-            const role = UserSession.get();
-            if (!role) {
-                BSAlert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
-                // Enviar al registro
-                document.querySelector('.auth-btn-register').click();
-                return;
-            }
+        const role = UserSession.get();
+        if (!role) {
+            BSAlert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
+            document.querySelector('.auth-btn-register').click();
+            return;
+        }
 
-            if (btn.classList.contains('locked') && role !== 'collab' && role !== 'admin') {
-                BSAlert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
-                document.querySelector('[data-target="pricing-view"]').click();
-                return;
-            }
-            
-            if (btn.textContent.includes('Presskit') || btn.title.toLowerCase().includes('descargar')) {
-                BSAlert('⬇️ Se ha iniciado la descarga del archivo en tu explorador... (Simulación)');
-            }
-        });
+        if (btn.classList.contains('locked') && role !== 'collab' && role !== 'admin') {
+            BSAlert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
+            document.querySelector('[data-target="pricing-view"]').click();
+            return;
+        }
+
+        // Descarga real desde la URL del track
+        const row = btn.closest('tr.track-row');
+        const src = row ? row.getAttribute('data-src') : null;
+        const title = row ? row.getAttribute('data-title') : 'track';
+        if (src) {
+            const a = document.createElement('a');
+            a.href = src;
+            a.download = title || 'track';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     });
 
     // 10. Lógica de Perfil de DJ
