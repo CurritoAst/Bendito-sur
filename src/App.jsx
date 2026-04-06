@@ -401,11 +401,11 @@ export default function App() {
                     </p>
                     <div className="hero-actions">
                         <button className="btn btn-primary btn-lg"
-                            onclick="document.querySelector('[data-target=\'pricing-view\']').click()">
+                            onClick={() => document.querySelector('[data-target="pricing-view"]').click()}>
                             <i className="ph ph-fire"></i> Ver Planes
                         </button>
                         <button className="btn btn-outline btn-lg"
-                            onclick="document.querySelector('[data-target=\'library-view\']').click()">
+                            onClick={() => document.querySelector('[data-target="library-view"]').click()}>
                             <i className="ph ph-music-notes"></i> Explorar Catalogo
                         </button>
                     </div>
