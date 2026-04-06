@@ -940,7 +940,10 @@ export default function App() {
         
         <section id="dashboard-view" className="view">
             <div className="dashboard-wrap">
-                <h2>Mi Cuenta</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+                    <h2 style={{ margin: 0 }}>Mi Cuenta</h2>
+                    <button className="btn btn-outline btn-sm auth-btn-logout" style={{ borderWidth: '1px' }}><i className="ph ph-sign-out"></i> Cerrar Sesión</button>
+                </div>
 
                 <div className="dashboard-grid">
 

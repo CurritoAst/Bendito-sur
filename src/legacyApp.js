@@ -741,8 +741,10 @@ export function initializeAppLogic() {
     // Botones de descarga (Presskit y pistas WAV/FLAC)
     // Delegación para botones de descarga (incluye filas dinámicas)
     document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.library-table .btn-icon, .dj-link');
-        if (!btn) return;
+        const btn = e.target.closest('.btn-icon');
+        if (!btn || btn.classList.contains('delete-track-btn')) return;
+        const row = btn.closest('tr.track-row');
+        if (!row) return;
         e.preventDefault();
 
         const role = UserSession.get();
@@ -759,9 +761,8 @@ export function initializeAppLogic() {
         }
 
         // Descarga real desde la URL del track
-        const row = btn.closest('tr.track-row');
-        const src = row ? row.getAttribute('data-src') : null;
-        const title = row ? row.getAttribute('data-title') : 'track';
+        const src = row.getAttribute('data-src');
+        const title = row.getAttribute('data-title') || 'track';
         if (src) {
             const a = document.createElement('a');
             a.href = src;
