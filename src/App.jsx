@@ -114,11 +114,11 @@ export default function App() {
                     background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)'
                 }}>
                     <div id="site-lock-logo" style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem', cursor: 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent', padding: '1rem 0.5rem' }}>
-                        BENDITO<em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '1px #f7a800' }}>SUR.</em>
+                        BENDITO<em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '1px #f3c948' }}>SUR.</em>
                     </div>
                     <div style={{
                         fontSize: '0.7rem', letterSpacing: '4px', textTransform: 'uppercase',
-                        color: '#f7a800', marginBottom: '1.5rem', fontWeight: 600
+                        color: '#f3c948', marginBottom: '1.5rem', fontWeight: 600
                     }}>🔒 Plataforma en Desarrollo</div>
                     <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.6', fontStyle: 'italic' }}>
                         Dentro de poco sabréis muchas cosas...
@@ -138,7 +138,7 @@ export default function App() {
                     <button id="site-lock-btn" style={{
                         width: '100%', padding: '0.85rem 1.5rem',
                         background: 'transparent', border: '1px solid rgba(247,168,0,0.4)',
-                        color: '#f7a800', fontFamily: 'Bebas Neue, sans-serif',
+                        color: '#f3c948', fontFamily: 'Bebas Neue, sans-serif',
                         fontSize: '1.1rem', letterSpacing: '4px', cursor: 'pointer',
                         borderRadius: '2px', transition: 'all 0.2s'
                     }}>ACCEDER →</button>
