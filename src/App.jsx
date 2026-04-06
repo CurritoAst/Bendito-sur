@@ -8,7 +8,18 @@ export default function App() {
         // Pantalla de bloqueo — Ctrl+Shift+9 (PC) o 5 toques en el logo (Móvil)
         const lockOverlay = document.getElementById('site-lock-overlay');
 
-        if (sessionStorage.getItem('bs_unlocked') === 'true') {
+        const unlock = () => {
+            sessionStorage.setItem('bs_unlocked', 'true');
+            if (lockOverlay) {
+                lockOverlay.style.opacity = '0';
+                setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
+            }
+        };
+
+        // Si ya está desbloqueado esta sesión, o si hay sesión de usuario → saltar pantalla
+        const alreadyUnlocked = sessionStorage.getItem('bs_unlocked') === 'true';
+        const hasSession = !!localStorage.getItem('benditoSession');
+        if (alreadyUnlocked || hasSession) {
             if (lockOverlay) lockOverlay.style.display = 'none';
         }
 
@@ -16,11 +27,7 @@ export default function App() {
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key === '9') {
                 e.preventDefault();
-                sessionStorage.setItem('bs_unlocked', 'true');
-                if (lockOverlay) {
-                    lockOverlay.style.opacity = '0';
-                    setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
-                }
+                unlock();
             }
         });
 
@@ -28,26 +35,28 @@ export default function App() {
         let tapCount = 0;
         let tapTimer = null;
         const lockLogo = document.getElementById('site-lock-logo');
+        const lockHint = document.getElementById('site-lock-hint');
+
+        const handleUnlockTap = () => {
+            tapCount++;
+            clearTimeout(tapTimer);
+            tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
+            // Feedback visual: muestra cuántos toques quedan
+            if (lockHint && tapCount > 0 && tapCount < 5) {
+                lockHint.textContent = `${5 - tapCount} toque${5 - tapCount !== 1 ? 's' : ''} más`;
+                lockHint.style.opacity = '1';
+            }
+            if (tapCount >= 5) {
+                tapCount = 0;
+                unlock();
+            }
+        };
+
         if (lockLogo) {
-            const handleUnlockTap = () => {
-                tapCount++;
-                clearTimeout(tapTimer);
-                tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
-                if (tapCount >= 5) {
-                    tapCount = 0;
-                    sessionStorage.setItem('bs_unlocked', 'true');
-                    if (lockOverlay) {
-                        lockOverlay.style.opacity = '0';
-                        setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
-                    }
-                }
-            };
-            // touchend para móvil (inmediato, sin delay de 300ms de iOS)
-            lockLogo.addEventListener('touchend', (e) => {
+            lockLogo.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 handleUnlockTap();
-            });
-            // click como fallback para desktop
+            }, { passive: false });
             lockLogo.addEventListener('click', handleUnlockTap);
         }
 
@@ -69,7 +78,7 @@ export default function App() {
                     border: '1px solid rgba(247,168,0,0.2)', borderRadius: '12px',
                     background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)'
                 }}>
-                    <div id="site-lock-logo" style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem', cursor: 'default', userSelect: 'none' }}>
+                    <div id="site-lock-logo" style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem', cursor: 'pointer', userSelect: 'none', WebkitTapHighlightColor: 'transparent', padding: '1rem 0.5rem' }}>
                         BENDITO<em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '1px #f7a800' }}>SUR.</em>
                     </div>
                     <div style={{
@@ -79,7 +88,8 @@ export default function App() {
                     <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.6', fontStyle: 'italic' }}>
                         Dentro de poco sabréis muchas cosas...
                     </p>
-                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', marginTop: '1rem', letterSpacing: '1px' }}>
+                    <p id="site-lock-hint" style={{ color: 'rgba(247,168,0,0.6)', fontSize: '0.7rem', marginTop: '0.5rem', letterSpacing: '1px', opacity: 0, transition: 'opacity 0.2s', minHeight: '1.2em' }}></p>
+                    <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', marginTop: '0.5rem', letterSpacing: '1px' }}>
                         Solo personal autorizado · benditosur.es
                     </p>
                 </div>
