@@ -1033,14 +1033,28 @@ export function initializeAppLogic() {
     initCatalog(supabaseClient);
 }
 
-// ─── CATALOG SYSTEM ──────────────────────────────────────────────────────────
+// ─── CATALOG SYSTEM (Storage JSON — sin base de datos) ───────────────────────
+
+const CATALOG_FILE = 'catalog.json';
+
+async function loadCatalog(sb) {
+    try {
+        const { data: urlData } = sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(CATALOG_FILE);
+        const res = await fetch(urlData.publicUrl + '?t=' + Date.now());
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+async function saveCatalog(sb, tracks) {
+    const blob = new Blob([JSON.stringify(tracks, null, 2)], { type: 'application/json' });
+    await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(CATALOG_FILE, blob, { upsert: true, contentType: 'application/json' });
+}
 
 function renderTrackRow(track) {
-    // Añade fila a la biblioteca pública
     const tbody = document.getElementById('library-tracks-body');
     const emptyRow = document.getElementById('library-empty-row');
     if (emptyRow) emptyRow.remove();
-
     const tr = document.createElement('tr');
     tr.className = 'track-row';
     tr.setAttribute('data-title', track.title);
@@ -1057,16 +1071,14 @@ function renderTrackRow(track) {
         <td>${track.locked
             ? '<button class="btn-icon locked" title="Requiere Suscripcion"><i class="ph-fill ph-lock-key"></i></button>'
             : '<button class="btn-icon" title="Descargar WAV"><i class="ph ph-download-simple"></i></button>'
-        }</td>
-    `;
+        }</td>`;
     if (tbody) tbody.appendChild(tr);
 }
 
-function renderAdminCatalogRow(track, supabaseClient) {
+function renderAdminCatalogRow(track, sb, allTracks) {
     const tbody = document.getElementById('admin-catalog-tbody');
     const emptyRow = document.getElementById('admin-catalog-empty');
     if (emptyRow) emptyRow.remove();
-
     const tr = document.createElement('tr');
     tr.setAttribute('data-id', track.id);
     tr.innerHTML = `
@@ -1076,18 +1088,15 @@ function renderAdminCatalogRow(track, supabaseClient) {
         <td class="text-secondary">${track.bpm || '—'}</td>
         <td class="text-secondary">${track.key || '—'}</td>
         <td>${track.locked ? '<span class="format-badge">Elite</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Libre</span>'}</td>
-        <td><button class="btn-icon delete-track-btn" title="Eliminar" style="color:var(--red)"><i class="ph ph-trash"></i></button></td>
-    `;
-    tr.querySelector('.delete-track-btn').addEventListener('click', async () => {
+        <td><button class="btn-icon delete-track-btn" title="Eliminar" style="color:var(--red)"><i class="ph ph-trash"></i></button></td>`;
+    tr.querySelector('.delete-track-btn').addEventListener('click', () => {
         BSConfirm('¿Eliminar esta pista del catálogo?').then(async ok => {
             if (!ok) return;
-            if (supabaseClient) {
-                await supabaseClient.from('tracks').delete().eq('id', track.id);
-            }
-            // Quitar de admin y de biblioteca
+            const updated = allTracks.filter(t => t.id !== track.id);
+            allTracks.length = 0; updated.forEach(t => allTracks.push(t));
+            await saveCatalog(sb, allTracks);
             tr.remove();
-            const libRow = document.querySelector(`.track-row[data-id="${track.id}"]`);
-            if (libRow) libRow.remove();
+            document.querySelector(`.track-row[data-id="${track.id}"]`)?.remove();
             BSAlert('✅ Pista eliminada del catálogo.');
         });
     });
@@ -1095,18 +1104,14 @@ function renderAdminCatalogRow(track, supabaseClient) {
 }
 
 async function initCatalog(supabaseClient) {
-    // Cargar pistas existentes desde Supabase
-    if (supabaseClient) {
-        try {
-            const { data, error } = await supabaseClient.from('tracks').select('*').order('created_at', { ascending: false });
-            if (!error && data) {
-                data.forEach(track => {
-                    renderTrackRow(track);
-                    renderAdminCatalogRow(track, supabaseClient);
-                });
-            }
-        } catch (e) { /* Supabase no conectado */ }
-    }
+    if (!supabaseClient) return;
+
+    // Cargar catálogo desde catalog.json
+    const tracks = await loadCatalog(supabaseClient);
+    tracks.forEach(t => {
+        renderTrackRow(t);
+        renderAdminCatalogRow(t, supabaseClient, tracks);
+    });
 
     // Formulario de subida
     const form = document.getElementById('upload-track-form');
@@ -1132,42 +1137,28 @@ async function initCatalog(supabaseClient) {
         btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Subiendo...';
         btn.disabled = true;
 
-        if (!supabaseClient) {
-            BSAlert('⚠️ Supabase no está configurado.\nConecta tu proyecto en el archivo .env para subir pistas a la nube.');
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            return;
-        }
-
         try {
-            // 1. Subir archivo a Storage
+            // 1. Subir archivo de audio
             const safeName = file.name
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // quitar acentos
-                .replace(/[^a-zA-Z0-9._-]/g, '_')                  // solo caracteres seguros
-                .replace(/_+/g, '_');                               // colapsar guiones bajos
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9._-]/g, '_')
+                .replace(/_+/g, '_');
             const filePath = `tracks/${Date.now()}_${safeName}`;
             const { error: uploadError } = await supabaseClient.storage
-                .from(CONFIG.STORAGE_BUCKET)
-                .upload(filePath, file, { upsert: false });
+                .from(CONFIG.STORAGE_BUCKET).upload(filePath, file, { upsert: false });
             if (uploadError) throw uploadError;
 
-            // 2. Obtener URL pública
-            const { data: urlData } = supabaseClient.storage
-                .from(CONFIG.STORAGE_BUCKET)
-                .getPublicUrl(filePath);
-            const audioUrl = urlData.publicUrl;
+            // 2. URL pública del audio
+            const { data: urlData } = supabaseClient.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(filePath);
 
-            // 3. Guardar metadatos en tabla `tracks`
-            const { data: inserted, error: insertError } = await supabaseClient
-                .from('tracks')
-                .insert([{ title, artist, genre, bpm: bpm || null, key: key || null, locked, audio_url: audioUrl }])
-                .select()
-                .single();
-            if (insertError) throw insertError;
+            // 3. Añadir al catálogo JSON
+            const newTrack = { id: Date.now().toString(), title, artist, genre, bpm: bpm || null, key: key || null, locked, audio_url: urlData.publicUrl };
+            tracks.push(newTrack);
+            await saveCatalog(supabaseClient, tracks);
 
-            // 4. Renderizar en biblioteca y en admin
-            renderTrackRow(inserted);
-            renderAdminCatalogRow(inserted, supabaseClient);
+            // 4. Renderizar
+            renderTrackRow(newTrack);
+            renderAdminCatalogRow(newTrack, supabaseClient, tracks);
 
             BSAlert(`✅ "${title}" subida al catálogo correctamente.`);
             form.reset();
