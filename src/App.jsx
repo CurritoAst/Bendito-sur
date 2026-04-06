@@ -594,69 +594,11 @@ export default function App() {
                                 <th></th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr className="track-row" data-title="Midnight Rave" data-artist="Alex Under">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Midnight Rave</td>
-                                <td className="text-secondary">Alex Under</td>
-                                <td><span className="genre-tag">Techno</span></td>
-                                <td className="text-secondary">132</td>
-                                <td className="text-secondary">8A</td>
-                                <td><button className="btn-icon locked" title="Requiere Suscripcion"><i className="ph-fill ph-lock-key"></i></button></td>
-                            </tr>
-                            <tr className="track-row" data-title="Deep Signals" data-artist="Nina Kraviz (Edit)">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Deep Signals</td>
-                                <td className="text-secondary">Nina Kraviz (Edit)</td>
-                                <td><span className="genre-tag">Acid Techno</span></td>
-                                <td className="text-secondary">135</td>
-                                <td className="text-secondary">9A</td>
-                                <td><button className="btn-icon" title="Descargar WAV"><i className="ph ph-download-simple"></i></button></td>
-                            </tr>
-                            <tr className="track-row" data-title="Groove Elements" data-artist="Marco Carola">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Groove Elements</td>
-                                <td className="text-secondary">Marco Carola</td>
-                                <td><span className="genre-tag">Tech House</span></td>
-                                <td className="text-secondary">128</td>
-                                <td className="text-secondary">11B</td>
-                                <td><button className="btn-icon" title="Descargar WAV"><i className="ph ph-download-simple"></i></button></td>
-                            </tr>
-                            <tr className="track-row" data-title="Noches del Sur" data-artist="DSJJ">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Noches del Sur</td>
-                                <td className="text-secondary">DSJJ</td>
-                                <td><span className="genre-tag">Flamenco House</span></td>
-                                <td className="text-secondary">124</td>
-                                <td className="text-secondary">7A</td>
-                                <td><button className="btn-icon" title="Descargar WAV"><i className="ph ph-download-simple"></i></button></td>
-                            </tr>
-                            <tr className="track-row" data-title="Patio de los Leones" data-artist="Andalucia Deep">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Patio de los Leones</td>
-                                <td className="text-secondary">Andalucia Deep</td>
-                                <td><span className="genre-tag">Latin House</span></td>
-                                <td className="text-secondary">126</td>
-                                <td className="text-secondary">5B</td>
-                                <td><button className="btn-icon locked" title="Requiere Suscripcion"><i className="ph-fill ph-lock-key"></i></button></td>
-                            </tr>
-                            <tr className="track-row" data-title="Giralda Club" data-artist="Sevilla Underground">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Giralda Club</td>
-                                <td className="text-secondary">Sevilla Underground</td>
-                                <td><span className="genre-tag">Minimal</span></td>
-                                <td className="text-secondary">130</td>
-                                <td className="text-secondary">6A</td>
-                                <td><button className="btn-icon locked" title="Requiere Suscripcion"><i className="ph-fill ph-lock-key"></i></button></td>
-                            </tr>
-                            <tr className="track-row" data-title="Minimalist Approach" data-artist="Richie Hawtin">
-                                <td><button className="track-play-btn"><i className="ph-fill ph-play-circle"></i></button></td>
-                                <td className="font-medium">Minimalist Approach</td>
-                                <td className="text-secondary">Richie Hawtin</td>
-                                <td><span className="genre-tag">Minimal</span></td>
-                                <td className="text-secondary">126</td>
-                                <td className="text-secondary">4A</td>
-                                <td><button className="btn-icon locked" title="Requiere Suscripcion"><i className="ph-fill ph-lock-key"></i></button></td>
+                        <tbody id="library-tracks-body">
+                            <tr id="library-empty-row">
+                                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.9rem', letterSpacing: '2px' }}>
+                                    CATÁLOGO EN PREPARACIÓN
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -1289,6 +1231,7 @@ export default function App() {
 
     
     <div id="global-player" className="audio-player hidden">
+        <audio id="bs-audio" preload="metadata"></audio>
         <div className="player-container">
             <div className="track-info">
                 <div className="track-artwork"></div>
@@ -1298,19 +1241,19 @@ export default function App() {
                 </div>
             </div>
             <div className="player-controls">
-                <button className="ctrl-btn"><i className="ph ph-skip-back-circle"></i></button>
-                <button className="ctrl-btn play-btn"><i className="ph-fill ph-play-circle"></i></button>
-                <button className="ctrl-btn"><i className="ph ph-skip-forward-circle"></i></button>
+                <button className="ctrl-btn" id="player-prev"><i className="ph ph-skip-back-circle"></i></button>
+                <button className="ctrl-btn play-btn" id="player-playpause"><i className="ph-fill ph-play-circle"></i></button>
+                <button className="ctrl-btn" id="player-next"><i className="ph ph-skip-forward-circle"></i></button>
             </div>
             <div className="player-timeline">
-                <span className="time current">0:00</span>
-                <div className="progress-bar">
-                    <div className="progress"></div>
+                <span className="time current" id="player-current">0:00</span>
+                <div className="progress-bar" id="player-progress-bar">
+                    <div className="progress" id="player-progress"></div>
                 </div>
-                <span className="time total">0:00</span>
+                <span className="time total" id="player-total">0:00</span>
             </div>
             <div className="player-actions">
-                <button className="action-btn"><i className="ph ph-download-simple"></i></button>
+                <button className="action-btn" id="player-download"><i className="ph ph-download-simple"></i></button>
             </div>
         </div>
     </div>
