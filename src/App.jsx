@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import './index.css';
 import { initializeAppLogic } from './legacyApp.js';
 
@@ -29,18 +29,26 @@ export default function App() {
         let tapTimer = null;
         const lockLogo = document.getElementById('site-lock-logo');
         if (lockLogo) {
-            lockLogo.addEventListener('click', () => {
+            const handleUnlockTap = () => {
                 tapCount++;
                 clearTimeout(tapTimer);
-                tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
+                tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
                 if (tapCount >= 5) {
+                    tapCount = 0;
                     sessionStorage.setItem('bs_unlocked', 'true');
                     if (lockOverlay) {
                         lockOverlay.style.opacity = '0';
                         setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
                     }
                 }
+            };
+            // touchend para móvil (inmediato, sin delay de 300ms de iOS)
+            lockLogo.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handleUnlockTap();
             });
+            // click como fallback para desktop
+            lockLogo.addEventListener('click', handleUnlockTap);
         }
 
         // Ejecutar lógica antigua sobre el DOM una vez montado

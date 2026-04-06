@@ -179,12 +179,13 @@ export function initializeAppLogic() {
         '.hero-kicker, .hero-title, .hero-description, .hero-actions, .hero-ring-wrap, .hero-stats'
     ));
 
+    // Excluir dashboard-card del reveal: están en vistas SPA ocultas (display:none)
+    // y el observer no detecta bien el cambio a visible en móvil, dejándolas opacity:0
     const revealTargets = [
         ...document.querySelectorAll('.benefit-row'),
         ...document.querySelectorAll('.dj-card'),
         ...document.querySelectorAll('.event-card'),
         ...document.querySelectorAll('.pricing-col'),
-        ...document.querySelectorAll('.dashboard-card'),
         ...document.querySelectorAll('.benefits-intro'),
         ...document.querySelectorAll('.pricing-intro'),
         ...document.querySelectorAll('.roster-head'),
@@ -388,12 +389,27 @@ export function initializeAppLogic() {
     document.querySelectorAll('.auth-btn-login').forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); navigateToAuth(true); }));
     document.querySelectorAll('.auth-btn-register').forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); navigateToAuth(false); }));
     
-    document.querySelectorAll('.auth-btn-dash').forEach(btn => btn.addEventListener('click', (e) => { 
-        e.preventDefault(); 
+    document.querySelectorAll('.auth-btn-dash').forEach(btn => btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Cerrar menú móvil si está abierto
+        const mobileMenuEl = document.getElementById('mobile-nav');
+        if (mobileMenuEl) mobileMenuEl.classList.remove('open');
+        const hambEl = document.getElementById('nav-hamburger');
+        if (hambEl && hambEl.querySelector('i')) hambEl.querySelector('i').className = 'ph ph-list';
+
         document.querySelectorAll('.view, .nav-item').forEach(v => v.classList.remove('active'));
         const target = document.getElementById('dashboard-view');
         if(target) target.classList.add('active');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Forzar reveal de tarjetas del dashboard
+        setTimeout(() => {
+            document.querySelectorAll('.reveal:not(.visible)').forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    el.classList.add('visible');
+                }
+            });
+        }, 60);
     }));
 
     document.querySelectorAll('.auth-btn-admin').forEach(btn => btn.addEventListener('click', (e) => { 
@@ -475,6 +491,14 @@ export function initializeAppLogic() {
                 
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 loginForm.reset();
+                setTimeout(() => {
+                    document.querySelectorAll('.reveal:not(.visible)').forEach(el => {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top < window.innerHeight && rect.bottom > 0) {
+                            el.classList.add('visible');
+                        }
+                    });
+                }, 60);
             }, 800);
         });
     }
@@ -503,6 +527,14 @@ export function initializeAppLogic() {
                 
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 registerForm.reset();
+                setTimeout(() => {
+                    document.querySelectorAll('.reveal:not(.visible)').forEach(el => {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top < window.innerHeight && rect.bottom > 0) {
+                            el.classList.add('visible');
+                        }
+                    });
+                }, 60);
             }, 1200);
         });
     }
