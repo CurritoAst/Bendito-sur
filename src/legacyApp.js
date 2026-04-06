@@ -739,38 +739,35 @@ export function initializeAppLogic() {
     });
 
     // Botones de descarga (Presskit y pistas WAV/FLAC)
-    // Delegación para botones de descarga (incluye filas dinámicas)
-    document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.btn-icon');
-        if (!btn || btn.classList.contains('delete-track-btn')) return;
+    // Delegación para botones de descarga (fetch blob — evita nueva pestaña)
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.track-download-btn');
+        if (!btn) return;
+        e.preventDefault();
         const row = btn.closest('tr.track-row');
         if (!row) return;
-        e.preventDefault();
-
-        const role = UserSession.get();
-        if (!role) {
-            BSAlert('🔒 Debes tener una cuenta activa para descargar. Serás redirigido al registro.');
-            document.querySelector('.auth-btn-register').click();
-            return;
-        }
-
-        if (btn.classList.contains('locked') && role !== 'collab' && role !== 'admin') {
-            BSAlert('🔒 Este archivo requiere una suscripción ELITE activa para ser descargado.');
-            document.querySelector('[data-target="pricing-view"]').click();
-            return;
-        }
-
-        // Descarga real desde la URL del track
         const src = row.getAttribute('data-src');
         const title = row.getAttribute('data-title') || 'track';
-        if (src) {
+        if (!src) return;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '⏳';
+        btn.disabled = true;
+        try {
+            const res = await fetch(src);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = src;
-            a.download = title || 'track';
-            a.target = '_blank';
+            a.href = url;
+            a.download = title;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch {
+            BSAlert('❌ Error al descargar el archivo.');
+        } finally {
+            btn.innerHTML = orig;
+            btn.disabled = false;
         }
     });
 
@@ -1078,8 +1075,8 @@ function renderTrackRow(track) {
     tr.setAttribute('data-src', track.audio_url);
     tr.setAttribute('data-id', track.id);
     const downloadBtn = track.locked
-        ? `<button class="btn-icon locked-btn" data-id="${track.id}" title="Solo Elite" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 8px;color:#f3c948;font-size:0.75rem;letter-spacing:1px;cursor:pointer">🔒 ELITE</button>`
-        : `<a href="${track.audio_url}" download="${track.title}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 10px;color:#fff;font-size:0.8rem;letter-spacing:1px;text-decoration:none;display:inline-block">⬇ WAV</a>`;
+        ? `<button class="btn-icon locked-btn" title="Solo Elite" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 8px;color:#f3c948;font-size:0.75rem;letter-spacing:1px;cursor:pointer">🔒 ELITE</button>`
+        : `<button class="track-download-btn" title="Descargar WAV" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 10px;color:#fff;font-size:0.8rem;letter-spacing:1px;cursor:pointer">⬇ WAV</button>`;
     tr.innerHTML = `
         <td><button class="track-play-btn" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:1.5rem">▶</button></td>
         <td class="font-medium">${track.title}</td>
