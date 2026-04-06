@@ -1,10 +1,7 @@
+// Seguridad: las claves reales se cargan desde variables de entorno (.env)
+// Nunca subas el .env a GitHub. Configura las variables en Vercel > Settings > Environment Variables.
 const CONFIG = {
-    // Reemplaza esto con tu Project URL de Supabase
-    SUPABASE_URL: 'TU_SUPABASE_URL_AQUI',
-    
-    // Reemplaza esto con tu anon/public key de Supabase
-    SUPABASE_ANON_KEY: 'TU_SUPABASE_ANON_KEY_AQUI',
-    
-    // Nombre del bucket de almacenamiento que crees en Supabase
-    STORAGE_BUCKET: 'collab-tracks'
+    SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || '',
+    SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    STORAGE_BUCKET: import.meta.env.VITE_STORAGE_BUCKET || 'collab-tracks'
 };
