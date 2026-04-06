@@ -1078,8 +1078,8 @@ function renderTrackRow(track) {
     tr.setAttribute('data-src', track.audio_url);
     tr.setAttribute('data-id', track.id);
     const downloadBtn = track.locked
-        ? `<button class="btn-icon" title="Solo Elite" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 8px;color:#f3c948;font-size:0.75rem;letter-spacing:1px;cursor:pointer">ELITE</button>`
-        : `<button class="btn-icon" title="Descargar WAV" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 10px;color:#fff;font-size:0.8rem;letter-spacing:1px;cursor:pointer">⬇ WAV</button>`;
+        ? `<button class="btn-icon locked-btn" data-id="${track.id}" title="Solo Elite" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 8px;color:#f3c948;font-size:0.75rem;letter-spacing:1px;cursor:pointer">🔒 ELITE</button>`
+        : `<a href="${track.audio_url}" download="${track.title}" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 10px;color:#fff;font-size:0.8rem;letter-spacing:1px;text-decoration:none;display:inline-block">⬇ WAV</a>`;
     tr.innerHTML = `
         <td><button class="track-play-btn" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:1.5rem">▶</button></td>
         <td class="font-medium">${track.title}</td>
