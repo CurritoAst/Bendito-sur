@@ -5,13 +5,14 @@ import { initializeAppLogic } from './legacyApp.js';
 
 export default function App() {
     useEffect(() => {
-        // Pantalla de bloqueo — se desbloquea con Ctrl+Shift+9
+        // Pantalla de bloqueo — Ctrl+Shift+9 (PC) o 5 toques en el logo (Móvil)
         const lockOverlay = document.getElementById('site-lock-overlay');
 
         if (sessionStorage.getItem('bs_unlocked') === 'true') {
             if (lockOverlay) lockOverlay.style.display = 'none';
         }
 
+        // Desbloqueo PC: Ctrl+Shift+9
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key === '9') {
                 e.preventDefault();
@@ -22,6 +23,25 @@ export default function App() {
                 }
             }
         });
+
+        // Desbloqueo Móvil: 5 toques rápidos en el logo
+        let tapCount = 0;
+        let tapTimer = null;
+        const lockLogo = document.getElementById('site-lock-logo');
+        if (lockLogo) {
+            lockLogo.addEventListener('click', () => {
+                tapCount++;
+                clearTimeout(tapTimer);
+                tapTimer = setTimeout(() => { tapCount = 0; }, 1500);
+                if (tapCount >= 5) {
+                    sessionStorage.setItem('bs_unlocked', 'true');
+                    if (lockOverlay) {
+                        lockOverlay.style.opacity = '0';
+                        setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
+                    }
+                }
+            });
+        }
 
         // Ejecutar lógica antigua sobre el DOM una vez montado
         initializeAppLogic();
@@ -41,7 +61,7 @@ export default function App() {
                     border: '1px solid rgba(247,168,0,0.2)', borderRadius: '12px',
                     background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)'
                 }}>
-                    <div style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem' }}>
+                    <div id="site-lock-logo" style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem', cursor: 'default', userSelect: 'none' }}>
                         BENDITO<em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '1px #f7a800' }}>SUR.</em>
                     </div>
                     <div style={{
