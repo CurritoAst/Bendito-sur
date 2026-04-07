@@ -1304,14 +1304,14 @@ async function initCatalog(supabaseClient) {
         btn.disabled = true;
 
         try {
-            // 1. Subir archivo de audio
+            // 1. Subir archivo de audio con su nombre original
             const safeName = file.name
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                 .replace(/[^a-zA-Z0-9._-]/g, '_')
                 .replace(/_+/g, '_');
-            const filePath = `tracks/${Date.now()}_${safeName}`;
+            const filePath = `tracks/${safeName}`;
             const { error: uploadError } = await supabaseClient.storage
-                .from(CONFIG.STORAGE_BUCKET).upload(filePath, file, { upsert: false });
+                .from(CONFIG.STORAGE_BUCKET).upload(filePath, file, { upsert: true });
             if (uploadError) throw uploadError;
 
             // 2. URL pública del audio
