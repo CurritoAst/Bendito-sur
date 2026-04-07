@@ -1258,12 +1258,23 @@ function renderAdminCatalogRow(track, sb, allTracks) {
     tr.querySelector('.delete-track-btn').addEventListener('click', () => {
         BSConfirm('¿Eliminar esta pista del catálogo?').then(async ok => {
             if (!ok) return;
+            // Borrar archivo de audio de Supabase Storage
+            if (sb && track.audio_url) {
+                try {
+                    const bucketBase = `/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/`;
+                    const idx = track.audio_url.indexOf(bucketBase);
+                    if (idx !== -1) {
+                        const storagePath = decodeURIComponent(track.audio_url.slice(idx + bucketBase.length).split('?')[0]);
+                        await sb.storage.from(CONFIG.STORAGE_BUCKET).remove([storagePath]);
+                    }
+                } catch (e) { console.warn('No se pudo borrar el archivo de storage:', e); }
+            }
             const updated = allTracks.filter(t => t.id !== track.id);
             allTracks.length = 0; updated.forEach(t => allTracks.push(t));
             await saveCatalog(sb, allTracks);
             tr.remove();
             document.querySelector(`.track-row[data-id="${track.id}"]`)?.remove();
-            BSAlert('✅ Pista eliminada del catálogo.');
+            BSAlert('✅ Pista eliminada del catálogo y del servidor.');
         });
     });
     if (tbody) tbody.appendChild(tr);
