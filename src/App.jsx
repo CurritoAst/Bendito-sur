@@ -1108,47 +1108,43 @@ export default function App() {
 
                     
                     <div id="admin-users" className="admin-section mt-2">
-                        <div className="dashboard-grid">
-                            
-                            <div className="dashboard-section">
-                                <h3 className="dashboard-card-title"><i className="ph ph-users"></i> Últimas Suscripciones Activas</h3>
-                                <div className="library-table-container">
-                                    <table className="library-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Fecha Alta</th>
-                                                <th>Usuario</th>
-                                                <th>Plan</th>
-                                                <th>Facturación</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td className="text-secondary">Hoy, 10:45</td>
-                                                <td className="font-medium">carlos.vamp@gmail.com</td>
-                                                <td><span className="format-badge">ELITE</span></td>
-                                                <td className="text-secondary">Stripe (Activo)</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-secondary">Ayer, 18:20</td>
-                                                <td className="font-medium">dj_andaluz_99@outlook.com</td>
-                                                <td><span className="format-badge">PRO</span></td>
-                                                <td className="text-secondary">Stripe (Activo)</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                        <div className="dashboard-section">
+                            <h3 className="dashboard-card-title">👥 Usuarios Registrados</h3>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', marginBottom: '1rem' }}>Lista real de personas que se han registrado en la plataforma.</p>
+                            <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                <button id="users-refresh-btn" className="btn btn-outline btn-sm">🔄 Actualizar</button>
+                                <span id="users-count" style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}></span>
                             </div>
-                            
-                            
-                            <div className="dashboard-card" style={{ "height": "fit-content" }}>
-                                <h3 className="dashboard-card-title"><i className="ph ph-user-plus text-gold"></i> Alta de Colaborador DJ</h3>
-                                <p className="text-secondary mb-3" style={{ "fontSize": "0.9rem" }}>Invita a un artista para que obtenga una cuenta "Acceso Total / Vitalicio" sin coste en la plataforma.</p>
-                                <form id="invite-collab-form" style={{ "display": "flex", "flexDirection": "column", "gap": "1rem" }}>
-                                    <input type="email" placeholder="Correo Electrónico del DJ" required style={{ "background": "rgba(255,255,255,0.05)", "border": "1px solid rgba(255,255,255,0.1)", "color": "#fff", "padding": "0.8rem", "borderRadius": "4px", "outline": "none", "width": "100%" }} />
-                                    <button type="submit" className="btn btn-outline" style={{ "borderColor": "var(--gold)", "color": "var(--gold)" }}>Enviar Invitación VIP</button>
-                                </form>
+                            <div className="library-table-container">
+                                <table className="library-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha Registro</th>
+                                            <th>Nombre DJ</th>
+                                            <th>Email</th>
+                                            <th>Plan</th>
+                                            <th>Provincia</th>
+                                            <th>IP Pública</th>
+                                            <th>Navegador</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="users-list-tbody">
+                                        <tr>
+                                            <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '2px' }}>CARGANDO USUARIOS...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
+                        </div>
+
+                        <div className="dashboard-card mt-2" style={{ height: 'fit-content' }}>
+                            <h3 className="dashboard-card-title">➕ Alta de Colaborador DJ</h3>
+                            <p className="text-secondary mb-3" style={{ fontSize: '0.9rem' }}>Invita a un artista para que obtenga una cuenta "Acceso Total / Vitalicio" sin coste en la plataforma.</p>
+                            <form id="invite-collab-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <input type="email" placeholder="Correo Electrónico del DJ" required style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '0.8rem', borderRadius: '4px', outline: 'none', width: '100%' }} />
+                                <button type="submit" className="btn btn-outline" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>Enviar Invitación VIP</button>
+                            </form>
                         </div>
                     </div>
 

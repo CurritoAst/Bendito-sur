@@ -830,8 +830,12 @@ export function initializeAppLogic() {
                 submitBtn.style.pointerEvents = 'auto';
                 
                 UserSession.set('user');
+                const regName = document.getElementById('reg-name')?.value?.trim() || '';
                 const regEmail = document.getElementById('reg-email')?.value?.trim() || 'nuevo_usuario';
+                const regPlan = document.getElementById('reg-plan')?.value || 'pro';
+                const regProvince = document.getElementById('reg-province')?.value?.trim() || '';
                 recordAccess(supabaseClient, regEmail, 'registro', 'user');
+                registerUser(supabaseClient, regName, regEmail, regPlan, regProvince);
                 BSAlert('✅ ¡Cuenta creada con éxito! Ya puedes escuchar lo mejor del sur.');
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
                 
@@ -1199,6 +1203,9 @@ export function initializeAppLogic() {
 
     // 14. PANEL DE SEGURIDAD — Registro de accesos
     initSecurityPanel(supabaseClient);
+
+    // 15. PANEL DE USUARIOS — Lista de registrados
+    initUsersPanel(supabaseClient);
 }
 
 // ─── CATALOG SYSTEM (Storage JSON — sin base de datos) ───────────────────────
@@ -1733,6 +1740,112 @@ async function initSecurityPanel(sb) {
                 renderSecurityLog([]);
                 BSAlert('✅ Historial de accesos borrado.');
             });
+        });
+    }
+}
+
+// ─── REGISTERED USERS SYSTEM (users.json en Storage) ────────────────────────
+
+const USERS_FILE = 'users.json';
+
+async function loadUsers(sb) {
+    try {
+        const url = sb
+            ? sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(USERS_FILE).data.publicUrl
+            : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${USERS_FILE}`;
+        const res = await fetch(url + '?t=' + Date.now());
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+async function saveUsers(sb, users) {
+    const blob = new Blob([JSON.stringify(users, null, 2)], { type: 'application/json' });
+    await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(USERS_FILE, blob, { upsert: true, contentType: 'application/json' });
+}
+
+async function registerUser(sb, name, email, plan, province) {
+    if (!sb || !CONFIG.SUPABASE_URL) return;
+    try {
+        const ip = await getPublicIP();
+        const browser = getBrowserInfo();
+        const users = await loadUsers(sb);
+        users.unshift({
+            id: Date.now().toString(),
+            date: new Date().toISOString(),
+            name: name || '',
+            email: email || '',
+            plan: plan || 'pro',
+            province: province || '',
+            ip,
+            browser
+        });
+        await saveUsers(sb, users);
+    } catch (e) { console.warn('Error registrando usuario:', e); }
+}
+
+function renderUsersList(users, sb) {
+    const tbody = document.getElementById('users-list-tbody');
+    const countEl = document.getElementById('users-count');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:rgba(255,255,255,0.25);font-size:0.85rem;letter-spacing:2px">SIN USUARIOS REGISTRADOS</td></tr>';
+        if (countEl) countEl.textContent = '';
+        return;
+    }
+
+    if (countEl) countEl.textContent = `${users.length} usuario${users.length > 1 ? 's' : ''}`;
+
+    users.forEach(user => {
+        const tr = document.createElement('tr');
+        const d = new Date(user.date);
+        const dateStr = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const planBadge = user.plan === 'elite'
+            ? '<span style="background:rgba(243,201,72,0.15);color:#f3c948;padding:2px 8px;border-radius:3px;font-size:0.75rem;font-weight:600">ELITE</span>'
+            : '<span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:2px 8px;border-radius:3px;font-size:0.75rem;font-weight:600">PRO</span>';
+        tr.setAttribute('data-user-id', user.id);
+        tr.innerHTML = `
+            <td class="text-secondary" style="white-space:nowrap">${dateStr}</td>
+            <td class="font-medium">${user.name || '—'}</td>
+            <td class="font-medium" style="color:rgba(255,255,255,0.7)">${user.email || '—'}</td>
+            <td>${planBadge}</td>
+            <td class="text-secondary">${user.province || '—'}</td>
+            <td style="font-family:monospace;color:rgba(255,255,255,0.6);font-size:0.82rem">${user.ip || '—'}</td>
+            <td class="text-secondary">${user.browser || '—'}</td>
+            <td><button class="delete-user-btn" title="Eliminar usuario" style="background:none;border:1px solid rgba(255,80,80,0.3);border-radius:4px;padding:3px 8px;color:#ff5050;font-size:0.8rem;cursor:pointer">🗑️</button></td>`;
+        tr.querySelector('.delete-user-btn').addEventListener('click', () => {
+            BSConfirm(`¿Eliminar al usuario ${user.email || user.name}?`).then(async ok => {
+                if (!ok) return;
+                const current = await loadUsers(sb);
+                const updated = current.filter(u => u.id !== user.id);
+                await saveUsers(sb, updated);
+                tr.remove();
+                if (countEl) countEl.textContent = `${updated.length} usuario${updated.length > 1 ? 's' : ''}`;
+                BSAlert('✅ Usuario eliminado.');
+            });
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+async function initUsersPanel(sb) {
+    if (!CONFIG.SUPABASE_URL) return;
+
+    const users = await loadUsers(sb);
+    renderUsersList(users, sb);
+
+    const refreshBtn = document.getElementById('users-refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.textContent = '⏳ Cargando...';
+            refreshBtn.disabled = true;
+            const freshUsers = await loadUsers(sb);
+            renderUsersList(freshUsers, sb);
+            refreshBtn.textContent = '🔄 Actualizar';
+            refreshBtn.disabled = false;
         });
     }
 }
