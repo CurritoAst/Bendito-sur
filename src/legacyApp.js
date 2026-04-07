@@ -783,16 +783,19 @@ export function initializeAppLogic() {
                 // Condición para Admin
                 if (email === 'admin@benditosur.es' && pass === 'admin123') {
                     UserSession.set('admin');
+                    recordAccess(supabaseClient, email, 'login', 'admin');
                     const view = document.getElementById('admin-view');
                     if(view) view.classList.add('active');
                     BSAlert('🔓 Acceso concedido al panel del Administrador.');
                 } else if (email === 'collab@benditosur.es' && pass === 'collab') {
                     UserSession.set('collab');
+                    recordAccess(supabaseClient, email, 'login', 'collab');
                     const view = document.getElementById('dashboard-view');
                     if(view) view.classList.add('active');
                     BSAlert('👑 Acceso vitalicio completado. Bienvenido, Colaborador Permanente.');
                 } else {
                     UserSession.set('user');
+                    recordAccess(supabaseClient, email, 'login', 'user');
                     const view = document.getElementById('dashboard-view');
                     if(view) view.classList.add('active');
                 }
@@ -827,6 +830,8 @@ export function initializeAppLogic() {
                 submitBtn.style.pointerEvents = 'auto';
                 
                 UserSession.set('user');
+                const regEmail = document.getElementById('reg-email')?.value?.trim() || 'nuevo_usuario';
+                recordAccess(supabaseClient, regEmail, 'registro', 'user');
                 BSAlert('✅ ¡Cuenta creada con éxito! Ya puedes escuchar lo mejor del sur.');
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
                 
@@ -1191,6 +1196,9 @@ export function initializeAppLogic() {
 
     // 13. CATÁLOGO — Subida de pistas y carga de biblioteca
     initCatalog(supabaseClient);
+
+    // 14. PANEL DE SEGURIDAD — Registro de accesos
+    initSecurityPanel(supabaseClient);
 }
 
 // ─── CATALOG SYSTEM (Storage JSON — sin base de datos) ───────────────────────
@@ -1600,5 +1608,132 @@ async function initCatalog(supabaseClient) {
         form.reset();
         renderFileList(null);
     });
+}
+
+// ─── SECURITY LOG SYSTEM (sessions.json en Storage) ─────────────────────────
+
+const SESSIONS_FILE = 'sessions.json';
+
+async function getPublicIP() {
+    try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        return data.ip;
+    } catch { return 'Desconocida'; }
+}
+
+function getBrowserInfo() {
+    const ua = navigator.userAgent;
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Edg/')) return 'Edge';
+    if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+    if (ua.includes('Chrome')) return 'Chrome';
+    if (ua.includes('Safari')) return 'Safari';
+    return 'Otro';
+}
+
+async function loadSessionLog(sb) {
+    try {
+        const url = sb
+            ? sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(SESSIONS_FILE).data.publicUrl
+            : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${SESSIONS_FILE}`;
+        const res = await fetch(url + '?t=' + Date.now());
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+async function saveSessionLog(sb, log) {
+    const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' });
+    await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(SESSIONS_FILE, blob, { upsert: true, contentType: 'application/json' });
+}
+
+async function recordAccess(sb, email, type, role) {
+    if (!sb || !CONFIG.SUPABASE_URL) return;
+    try {
+        const ip = await getPublicIP();
+        const browser = getBrowserInfo();
+        const log = await loadSessionLog(sb);
+        log.unshift({
+            date: new Date().toISOString(),
+            email,
+            type,
+            role,
+            ip,
+            browser
+        });
+        // Mantener últimos 200 registros
+        if (log.length > 200) log.length = 200;
+        await saveSessionLog(sb, log);
+    } catch (e) { console.warn('Error registrando acceso:', e); }
+}
+
+function renderSecurityLog(log) {
+    const tbody = document.getElementById('security-log-tbody');
+    const countEl = document.getElementById('security-count');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!log || log.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:rgba(255,255,255,0.25);font-size:0.85rem;letter-spacing:2px">SIN REGISTROS</td></tr>';
+        if (countEl) countEl.textContent = '';
+        return;
+    }
+
+    if (countEl) countEl.textContent = `${log.length} registro${log.length > 1 ? 's' : ''}`;
+
+    log.forEach(entry => {
+        const tr = document.createElement('tr');
+        const d = new Date(entry.date);
+        const dateStr = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const typeBadge = entry.type === 'login'
+            ? '<span style="background:rgba(243,201,72,0.15);color:#f3c948;padding:2px 8px;border-radius:3px;font-size:0.75rem">LOGIN</span>'
+            : '<span style="background:rgba(80,200,120,0.15);color:#50c878;padding:2px 8px;border-radius:3px;font-size:0.75rem">REGISTRO</span>';
+        const roleBadge = entry.role === 'admin'
+            ? '<span style="color:#ff5050;font-weight:600">Admin</span>'
+            : entry.role === 'collab'
+            ? '<span style="color:#f3c948;font-weight:600">Collab</span>'
+            : '<span style="color:rgba(255,255,255,0.5)">User</span>';
+        tr.innerHTML = `
+            <td class="text-secondary" style="white-space:nowrap">${dateStr}</td>
+            <td class="font-medium">${entry.email || '—'}</td>
+            <td>${typeBadge}</td>
+            <td>${roleBadge}</td>
+            <td style="font-family:monospace;color:rgba(255,255,255,0.6);font-size:0.82rem">${entry.ip || '—'}</td>
+            <td class="text-secondary">${entry.browser || '—'}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+async function initSecurityPanel(sb) {
+    if (!CONFIG.SUPABASE_URL) return;
+
+    const log = await loadSessionLog(sb);
+    renderSecurityLog(log);
+
+    const refreshBtn = document.getElementById('security-refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.textContent = '⏳ Cargando...';
+            refreshBtn.disabled = true;
+            const freshLog = await loadSessionLog(sb);
+            renderSecurityLog(freshLog);
+            refreshBtn.textContent = '🔄 Actualizar';
+            refreshBtn.disabled = false;
+        });
+    }
+
+    const clearBtn = document.getElementById('security-clear-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            BSConfirm('¿Borrar todo el historial de accesos?').then(async ok => {
+                if (!ok) return;
+                await saveSessionLog(sb, []);
+                renderSecurityLog([]);
+                BSAlert('✅ Historial de accesos borrado.');
+            });
+        });
+    }
 }
 

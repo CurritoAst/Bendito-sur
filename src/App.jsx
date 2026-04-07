@@ -1077,43 +1077,28 @@ export default function App() {
                     
                     <div id="admin-security" className="admin-section mt-2">
                         <div className="dashboard-section">
-                            <h3 className="dashboard-card-title"><i className="ph ph-warning-circle" style={{ "color": "var(--red)" }}></i> Control de Multicuentas y Sesiones</h3>
+                            <h3 className="dashboard-card-title">🛡️ Registro de Accesos</h3>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', marginBottom: '1rem' }}>Cada login y registro queda registrado con IP pública, fecha y navegador.</p>
+                            <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                <button id="security-refresh-btn" className="btn btn-outline btn-sm">🔄 Actualizar</button>
+                                <button id="security-clear-btn" className="btn btn-outline btn-sm" style={{ borderColor: 'rgba(255,80,80,0.4)', color: '#ff5050' }}>🗑️ Borrar historial</button>
+                                <span id="security-count" style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}></span>
+                            </div>
                             <div className="library-table-container">
                                 <table className="library-table">
                                     <thead>
                                         <tr>
-                                            <th>Usuario / Email</th>
-                                            <th>Plan</th>
-                                            <th>Sesiones Activas</th>
-                                            <th>IPs Recientes (48h)</th>
-                                            <th>Estado</th>
-                                            <th>Acción</th>
+                                            <th>Fecha</th>
+                                            <th>Email</th>
+                                            <th>Tipo</th>
+                                            <th>Rol</th>
+                                            <th>IP Pública</th>
+                                            <th>Navegador</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        <tr style={{ "backgroundColor": "rgba(192, 40, 48, 0.1)" }}>
-                                            <td className="font-medium">dj.jose@gmail.com</td>
-                                            <td><span className="format-badge">ELITE</span></td>
-                                            <td style={{ "color": "var(--red)", "fontWeight": "bold" }}>4 dispositivos</td>
-                                            <td className="text-secondary">Sevilla, Madrid, Barcelona</td>
-                                            <td><span className="status-badge" style={{ "background": "var(--red)", "color": "white", "border": "none" }}>Riesgo Alto</span></td>
-                                            <td><button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--red)", "color": "var(--red)" }} onClick={() => BSAlert('✅ Sesiones revocadas y usuario notificado.')}>Revocar</button></td>
-                                        </tr>
-                                        <tr>
-                                            <td className="font-medium">alex.under@hotmail.com</td>
-                                            <td><span className="format-badge">PRO</span></td>
-                                            <td className="text-secondary">1 dispositivo</td>
-                                            <td className="text-secondary">Málaga</td>
-                                            <td><span className="status-badge active" style={{ "marginBottom": "0" }}>Limpio</span></td>
-                                            <td><button className="btn btn-outline btn-sm">Ver</button></td>
-                                        </tr>
-                                        <tr style={{ "backgroundColor": "rgba(212, 137, 10, 0.1)" }}>
-                                            <td className="font-medium">m.garcia_77@yahoo.es</td>
-                                            <td><span className="format-badge">ELITE</span></td>
-                                            <td className="text-secondary" style={{ "color": "var(--gold)" }}>2 dispositivos</td>
-                                            <td className="text-secondary">Granada, Almería</td>
-                                            <td><span className="status-badge" style={{ "background": "var(--gold)", "color": "var(--bg)", "border": "none" }}>Sospechoso</span></td>
-                                            <td><button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--gold)", "color": "var(--gold)" }} onClick={() => BSAlert('🔒 Iniciando verificación extra de identidad.')}>Verificar</button></td>
+                                    <tbody id="security-log-tbody">
+                                        <tr id="security-empty-row">
+                                            <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '2px' }}>CARGANDO REGISTROS...</td>
                                         </tr>
                                     </tbody>
                                 </table>
