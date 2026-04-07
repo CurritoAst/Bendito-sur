@@ -97,7 +97,7 @@ export function initializeAppLogic() {
         });
     });
 
-    // 3. Audio Player Logic (Real HTML5)
+    // 3. Audio Player Logic (Real HTML5 + Web Audio API Preview)
     const globalPlayer = document.getElementById('global-player');
     const appContent = document.getElementById('app-content');
     const audio = document.getElementById('bs-audio');
@@ -113,9 +113,16 @@ export function initializeAppLogic() {
     const downloadBtn = document.getElementById('player-download');
 
     let currentTrackIndex = -1;
+    let isPreviewMode = false;
+    let previewAudioCtx = null;
+    let previewTimeout = null;
+    let previewStartTime = 0;
+    let previewDuration = 30; // 30 seconds preview
+    let previewAnimFrame = null;
+    let previewNodes = [];
 
     function getTrackRows() {
-        return Array.from(document.querySelectorAll('.track-row[data-src]'));
+        return Array.from(document.querySelectorAll('tr.track-row'));
     }
 
     function formatTime(s) {
@@ -125,16 +132,147 @@ export function initializeAppLogic() {
         return `${m}:${sec.toString().padStart(2, '0')}`;
     }
 
+    // === Web Audio API Preview System ===
+    function stopPreview() {
+        if (previewAudioCtx) {
+            previewNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch {} });
+            previewNodes = [];
+            try { previewAudioCtx.close(); } catch {}
+            previewAudioCtx = null;
+        }
+        if (previewTimeout) { clearTimeout(previewTimeout); previewTimeout = null; }
+        if (previewAnimFrame) { cancelAnimationFrame(previewAnimFrame); previewAnimFrame = null; }
+        isPreviewMode = false;
+    }
+
+    function generatePreviewBeat(bpmHint) {
+        stopPreview();
+        isPreviewMode = true;
+        previewAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = previewAudioCtx;
+        const bpm = bpmHint || 126;
+        const beatInterval = 60 / bpm;
+        const masterGain = ctx.createGain();
+        masterGain.gain.value = 0.35;
+        masterGain.connect(ctx.destination);
+
+        // Generate a 30-second electronic loop
+        const now = ctx.currentTime;
+        previewDuration = 30;
+        previewStartTime = now;
+
+        // Kick drum synthesis
+        for (let i = 0; i < bpm / 2; i++) {
+            const t = now + i * beatInterval;
+            if (t > now + previewDuration) break;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(30, t + 0.12);
+            gain.gain.setValueAtTime(0.8, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start(t);
+            osc.stop(t + 0.25);
+            previewNodes.push(osc);
+        }
+
+        // Hi-hat synthesis (8th notes)
+        for (let i = 0; i < bpm; i++) {
+            const t = now + i * (beatInterval / 2);
+            if (t > now + previewDuration) break;
+            const bufferSize = ctx.sampleRate * 0.04;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let j = 0; j < bufferSize; j++) data[j] = (Math.random() * 2 - 1) * 0.3;
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+            const hihatGain = ctx.createGain();
+            const hihatFilter = ctx.createBiquadFilter();
+            hihatFilter.type = 'highpass';
+            hihatFilter.frequency.value = 7000;
+            hihatGain.gain.setValueAtTime(i % 2 === 0 ? 0.15 : 0.08, t);
+            hihatGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+            noise.connect(hihatFilter);
+            hihatFilter.connect(hihatGain);
+            hihatGain.connect(masterGain);
+            noise.start(t);
+            noise.stop(t + 0.06);
+            previewNodes.push(noise);
+        }
+
+        // Bass synth (every 2 beats)
+        const bassNotes = [55, 65.41, 49, 61.74]; // A1, C2, G1, B1
+        for (let i = 0; i < bpm / 4; i++) {
+            const t = now + i * beatInterval * 2;
+            if (t > now + previewDuration) break;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = bassNotes[i % bassNotes.length];
+            const bassFilter = ctx.createBiquadFilter();
+            bassFilter.type = 'lowpass';
+            bassFilter.frequency.value = 300;
+            gain.gain.setValueAtTime(0.3, t);
+            gain.gain.setValueAtTime(0.3, t + beatInterval * 1.5);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + beatInterval * 2);
+            osc.connect(bassFilter);
+            bassFilter.connect(gain);
+            gain.connect(masterGain);
+            osc.start(t);
+            osc.stop(t + beatInterval * 2);
+            previewNodes.push(osc);
+        }
+
+        // Update progress animation
+        setPlayIcon(true);
+        if (totalTimeEl) totalTimeEl.textContent = formatTime(previewDuration);
+
+        function updatePreviewProgress() {
+            if (!previewAudioCtx || previewAudioCtx.state === 'closed') return;
+            const elapsed = previewAudioCtx.currentTime - previewStartTime;
+            const pct = Math.min((elapsed / previewDuration) * 100, 100);
+            if (progressFill) progressFill.style.width = pct + '%';
+            if (currentTimeEl) currentTimeEl.textContent = formatTime(elapsed);
+            if (elapsed < previewDuration) {
+                previewAnimFrame = requestAnimationFrame(updatePreviewProgress);
+            } else {
+                // Preview ended
+                stopPreview();
+                setPlayIcon(false);
+                if (progressFill) progressFill.style.width = '0%';
+                if (currentTimeEl) currentTimeEl.textContent = '0:00';
+                // Auto-next
+                const rows = getTrackRows();
+                if (rows.length > 0 && currentTrackIndex < rows.length - 1) {
+                    loadTrack(rows[currentTrackIndex + 1]);
+                }
+            }
+        }
+        previewAnimFrame = requestAnimationFrame(updatePreviewProgress);
+
+        // Safety stop after duration
+        previewTimeout = setTimeout(() => {
+            stopPreview();
+            setPlayIcon(false);
+        }, previewDuration * 1000 + 500);
+    }
+
     function loadTrack(row, autoplay = true) {
+        // Stop any preview in progress
+        stopPreview();
+        if (audio && !audio.paused) audio.pause();
+
         const src = row.getAttribute('data-src');
         const title = row.getAttribute('data-title') || 'Sin título';
         const artist = row.getAttribute('data-artist') || '';
-        if (!src) return;
+        const bpmAttr = row.getAttribute('data-bpm') || row.querySelector('td:nth-child(5)')?.textContent?.trim();
+        const bpm = parseInt(bpmAttr) || 126;
 
-        audio.src = src;
         if (playerTitle) playerTitle.textContent = title;
         if (playerArtist) playerArtist.textContent = artist;
-        if (downloadBtn) downloadBtn.setAttribute('data-src', src);
 
         // Marcar fila activa
         document.querySelectorAll('.track-row').forEach(r => r.classList.remove('playing'));
@@ -144,13 +282,23 @@ export function initializeAppLogic() {
         currentTrackIndex = getTrackRows().indexOf(row);
 
         // Mostrar player
-        if (globalPlayer.classList.contains('hidden')) {
-            globalPlayer.classList.remove('hidden');
-            if (appContent) appContent.style.paddingBottom = '100px';
-        }
+        globalPlayer.style.display = 'flex';
+        if (appContent) appContent.style.paddingBottom = '100px';
 
-        if (autoplay) {
-            audio.play().catch(() => {});
+        if (src && src !== 'undefined' && src !== 'null') {
+            // Real audio file
+            isPreviewMode = false;
+            audio.src = src;
+            if (downloadBtn) downloadBtn.setAttribute('data-src', src);
+            if (autoplay) {
+                audio.play().catch(() => {});
+            }
+        } else {
+            // No real file → generate preview beat
+            if (downloadBtn) downloadBtn.removeAttribute('data-src');
+            if (autoplay) {
+                generatePreviewBeat(bpm);
+            }
         }
     }
 
@@ -172,12 +320,14 @@ export function initializeAppLogic() {
             }
         });
         audio.addEventListener('timeupdate', () => {
+            if (isPreviewMode) return; // preview has its own progress
             if (!audio.duration) return;
             const pct = (audio.currentTime / audio.duration) * 100;
             if (progressFill) progressFill.style.width = pct + '%';
             if (currentTimeEl) currentTimeEl.textContent = formatTime(audio.currentTime);
         });
         audio.addEventListener('loadedmetadata', () => {
+            if (isPreviewMode) return;
             if (totalTimeEl) totalTimeEl.textContent = formatTime(audio.duration);
         });
     }
@@ -185,6 +335,27 @@ export function initializeAppLogic() {
     // Play / Pause
     if (playPauseBtn) {
         playPauseBtn.addEventListener('click', () => {
+            if (isPreviewMode) {
+                // Toggle preview
+                if (previewAudioCtx && previewAudioCtx.state === 'running') {
+                    previewAudioCtx.suspend();
+                    setPlayIcon(false);
+                } else if (previewAudioCtx && previewAudioCtx.state === 'suspended') {
+                    previewAudioCtx.resume();
+                    setPlayIcon(true);
+                    // Resume progress animation
+                    function resumeProgress() {
+                        if (!previewAudioCtx || previewAudioCtx.state !== 'running') return;
+                        const elapsed = previewAudioCtx.currentTime - previewStartTime;
+                        const pct = Math.min((elapsed / previewDuration) * 100, 100);
+                        if (progressFill) progressFill.style.width = pct + '%';
+                        if (currentTimeEl) currentTimeEl.textContent = formatTime(elapsed);
+                        if (elapsed < previewDuration) previewAnimFrame = requestAnimationFrame(resumeProgress);
+                    }
+                    previewAnimFrame = requestAnimationFrame(resumeProgress);
+                }
+                return;
+            }
             if (!audio.src) return;
             audio.paused ? audio.play().catch(() => {}) : audio.pause();
         });
@@ -213,6 +384,10 @@ export function initializeAppLogic() {
     // Click en barra de progreso
     if (progressBar) {
         progressBar.addEventListener('click', (e) => {
+            if (isPreviewMode) {
+                // Cannot seek in preview mode
+                return;
+            }
             if (!audio.duration) return;
             const rect = progressBar.getBoundingClientRect();
             const pct = (e.clientX - rect.left) / rect.width;
@@ -224,7 +399,10 @@ export function initializeAppLogic() {
     if (downloadBtn) {
         downloadBtn.addEventListener('click', () => {
             const src = downloadBtn.getAttribute('data-src');
-            if (!src) return;
+            if (!src) {
+                BSAlert('🎧 Esta es una preview generada. No hay archivo descargable.');
+                return;
+            }
             const a = document.createElement('a');
             a.href = src;
             a.download = '';
@@ -238,11 +416,7 @@ export function initializeAppLogic() {
         if (!btn) return;
         const row = btn.closest('tr.track-row');
         if (!row) return;
-        const src = row.getAttribute('data-src');
-        if (!src) {
-            BSAlert('⚠️ Esta pista aún no tiene audio asignado.');
-            return;
-        }
+        // Always load the track — preview mode handles missing src
         loadTrack(row, true);
     });
 
@@ -834,28 +1008,8 @@ export function initializeAppLogic() {
                     });
                 });
 
-                profileTracks.querySelectorAll('.track-play-btn').forEach(btn => {
-                    btn.addEventListener('click', (ev) => {
-                        ev.stopPropagation();
-                        // Mock the play action
-                        const row = ev.target.closest('tr');
-                        const title = row.getAttribute('data-title');
-                        const artist = row.getAttribute('data-artist');
-                        
-                        const globPlayer = document.getElementById('global-player');
-                        if (globPlayer.classList.contains('hidden')) {
-                            globPlayer.classList.remove('hidden');
-                            document.getElementById('app-content').style.paddingBottom = '100px';
-                        }
-                        
-                        document.querySelector('.track-title').textContent = title;
-                        document.querySelector('.track-artist').textContent = artist;
-                        
-                        const mainPlayBtn = globPlayer.querySelector('.play-btn i');
-                        mainPlayBtn.classList.remove('ph-play-circle');
-                        mainPlayBtn.classList.add('ph-pause-circle');
-                    });
-                });
+                // track-play-btn clicks are handled by the global delegated handler
+                // which now supports preview mode for tracks without audio files
             }
 
             // Ocultar todas las vistas y mostrar el perfil

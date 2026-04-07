@@ -1294,31 +1294,33 @@ export default function App() {
     </main>
 
     
-    <div id="global-player" className="audio-player hidden">
+    <div id="global-player" style={{
+        position:'fixed', bottom:0, left:0, width:'100%', height:'70px',
+        background:'#111', borderTop:'1px solid rgba(243,201,72,0.2)',
+        zIndex:9999, display:'none', alignItems:'center'
+    }}>
         <audio id="bs-audio" preload="metadata"></audio>
-        <div className="player-container">
-            <div className="track-info">
-                <div className="track-artwork"></div>
-                <div className="track-details">
-                    <h4 className="track-title">Pista Seleccionada</h4>
-                    <p className="track-artist">Artista</p>
+        <div style={{maxWidth:'1280px', margin:'0 auto', padding:'0 2rem', height:'100%', display:'flex', alignItems:'center', gap:'1.5rem', width:'100%'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'0.85rem', width:'25%', minWidth:0}}>
+                <div style={{width:'44px', height:'44px', background:'#f3c948', opacity:0.7, flexShrink:0}}></div>
+                <div style={{overflow:'hidden'}}>
+                    <div className="track-title" style={{fontSize:'0.85rem', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:'#fff'}}></div>
+                    <div className="track-artist" style={{fontSize:'0.73rem', color:'rgba(255,255,255,0.4)'}}></div>
                 </div>
             </div>
-            <div className="player-controls">
-                <button className="ctrl-btn" id="player-prev" style={{fontSize:'1.4rem', background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer'}}>⏮</button>
-                <button className="ctrl-btn play-btn" id="player-playpause" style={{fontSize:'2rem', background:'none', border:'none', color:'#f3c948', cursor:'pointer'}}>▶</button>
-                <button className="ctrl-btn" id="player-next" style={{fontSize:'1.4rem', background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer'}}>⏭</button>
+            <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
+                <button id="player-prev" style={{fontSize:'1.3rem', background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer', padding:'4px'}}>⏮</button>
+                <button id="player-playpause" style={{fontSize:'2rem', background:'none', border:'none', color:'#f3c948', cursor:'pointer', padding:'4px', lineHeight:1}}>▶</button>
+                <button id="player-next" style={{fontSize:'1.3rem', background:'none', border:'none', color:'rgba(255,255,255,0.6)', cursor:'pointer', padding:'4px'}}>⏭</button>
             </div>
-            <div className="player-timeline">
-                <span className="time current" id="player-current">0:00</span>
-                <div className="progress-bar" id="player-progress-bar" style={{cursor:'pointer'}}>
-                    <div className="progress" id="player-progress"></div>
+            <div style={{display:'flex', alignItems:'center', gap:'0.75rem', flex:1}}>
+                <span id="player-current" style={{fontSize:'0.68rem', color:'rgba(255,255,255,0.4)', minWidth:'32px'}}>0:00</span>
+                <div id="player-progress-bar" style={{flex:1, height:'3px', background:'rgba(255,255,255,0.15)', cursor:'pointer', position:'relative', borderRadius:'2px'}}>
+                    <div id="player-progress" style={{position:'absolute', top:0, left:0, height:'100%', width:'0%', background:'#f3c948', borderRadius:'2px'}}></div>
                 </div>
-                <span className="time total" id="player-total">0:00</span>
+                <span id="player-total" style={{fontSize:'0.68rem', color:'rgba(255,255,255,0.4)', minWidth:'32px'}}>0:00</span>
             </div>
-            <div className="player-actions">
-                <button className="action-btn" id="player-download" style={{fontSize:'1.2rem', background:'none', border:'none', color:'rgba(255,255,255,0.5)', cursor:'pointer'}}>⬇</button>
-            </div>
+            <button id="player-download" style={{fontSize:'1.2rem', background:'none', border:'none', color:'rgba(255,255,255,0.4)', cursor:'pointer', padding:'4px'}}>⬇</button>
         </div>
     </div>
 
