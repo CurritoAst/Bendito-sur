@@ -1269,6 +1269,33 @@ function renderAdminCatalogRow(track, sb, allTracks) {
     if (tbody) tbody.appendChild(tr);
 }
 
+// Extraer título y artista del nombre de archivo
+// Formatos: "Artista - Título.wav" → {artist, title} | "Título.wav" → {artist:'', title}
+function parseFileName(fileName) {
+    const nameOnly = fileName.replace(/\.[^.]+$/, '');
+    if (nameOnly.includes(' - ')) {
+        const parts = nameOnly.split(' - ');
+        return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
+    }
+    return { artist: '', title: nameOnly.trim() };
+}
+
+function renderFileList(files) {
+    const container = document.getElementById('upload-file-list');
+    if (!container) return;
+    if (!files || files.length === 0) { container.innerHTML = ''; return; }
+    const rows = Array.from(files).map((f, i) => {
+        const { artist, title } = parseFileName(f.name);
+        return `<div style="display:flex;align-items:center;gap:0.8rem;padding:0.5rem 0.7rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:3px;margin-bottom:4px">
+            <span style="color:#f3c948;font-size:0.8rem;min-width:22px">${i + 1}.</span>
+            <span style="color:#fff;font-size:0.85rem;flex:1">${title}</span>
+            <span style="color:rgba(255,255,255,0.4);font-size:0.8rem">${artist || 'Sin artista'}</span>
+            <span style="color:rgba(255,255,255,0.2);font-size:0.7rem">${(f.size / 1048576).toFixed(1)} MB</span>
+        </div>`;
+    }).join('');
+    container.innerHTML = `<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:0.4rem">${files.length} archivo${files.length > 1 ? 's' : ''} seleccionado${files.length > 1 ? 's' : ''}</div>${rows}`;
+}
+
 async function initCatalog(supabaseClient) {
     if (!CONFIG.SUPABASE_URL) return;
 
@@ -1279,20 +1306,23 @@ async function initCatalog(supabaseClient) {
         renderAdminCatalogRow(t, supabaseClient, tracks);
     });
 
-    // Formulario de subida
+    // Preview de archivos seleccionados
+    const fileInput = document.getElementById('track-file-input');
+    if (fileInput) {
+        fileInput.addEventListener('change', () => renderFileList(fileInput.files));
+    }
+
+    // Formulario de subida múltiple
     const form = document.getElementById('upload-track-form');
     if (!form) return;
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('upload-track-btn');
-        const fileInput = document.getElementById('track-file-input');
-        const file = fileInput.files[0];
-        const title = document.getElementById('track-title').value.trim();
-        const artist = document.getElementById('track-artist').value.trim();
+        const progressText = document.getElementById('upload-progress-text');
+        const files = fileInput.files;
 
-        if (!file) { BSAlert('⚠️ Selecciona un archivo de audio.'); return; }
-        if (!title || !artist) { BSAlert('⚠️ Título y artista son obligatorios.'); return; }
+        if (!files || files.length === 0) { BSAlert('⚠️ Selecciona al menos un archivo de audio.'); return; }
 
         const genre = document.getElementById('track-genre').value.trim();
         const bpm = document.getElementById('track-bpm').value.trim();
@@ -1303,37 +1333,63 @@ async function initCatalog(supabaseClient) {
         btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Subiendo...';
         btn.disabled = true;
 
-        try {
-            // 1. Subir archivo de audio con su nombre original
-            const safeName = file.name
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-zA-Z0-9._-]/g, '_')
-                .replace(/_+/g, '_');
-            const filePath = `tracks/${safeName}`;
-            const { error: uploadError } = await supabaseClient.storage
-                .from(CONFIG.STORAGE_BUCKET).upload(filePath, file, { upsert: true });
-            if (uploadError) throw uploadError;
+        let uploaded = 0;
+        let errors = 0;
 
-            // 2. URL pública del audio
-            const { data: urlData } = supabaseClient.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(filePath);
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const { artist, title } = parseFileName(file.name);
+            if (progressText) progressText.textContent = `Subiendo ${i + 1} de ${files.length}: ${title}`;
 
-            // 3. Añadir al catálogo JSON
-            const newTrack = { id: Date.now().toString(), title, artist, genre, bpm: bpm || null, key: key || null, locked, audio_url: urlData.publicUrl };
-            tracks.push(newTrack);
-            await saveCatalog(supabaseClient, tracks);
+            try {
+                const safeName = file.name
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-zA-Z0-9._-]/g, '_')
+                    .replace(/_+/g, '_');
+                const filePath = `tracks/${Date.now()}_${safeName}`;
+                const { error: uploadError } = await supabaseClient.storage
+                    .from(CONFIG.STORAGE_BUCKET).upload(filePath, file, { upsert: false });
+                if (uploadError) throw uploadError;
 
-            // 4. Renderizar
-            renderTrackRow(newTrack);
-            renderAdminCatalogRow(newTrack, supabaseClient, tracks);
+                const { data: urlData } = supabaseClient.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(filePath);
 
-            BSAlert(`✅ "${title}" subida al catálogo correctamente.`);
-            form.reset();
-        } catch (err) {
-            BSAlert('❌ Error al subir: ' + err.message);
-        } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+                const newTrack = {
+                    id: Date.now().toString() + '_' + i,
+                    title: title || file.name,
+                    artist: artist || '',
+                    genre,
+                    bpm: bpm || null,
+                    key: key || null,
+                    locked,
+                    audio_url: urlData.publicUrl
+                };
+                tracks.push(newTrack);
+                renderTrackRow(newTrack);
+                renderAdminCatalogRow(newTrack, supabaseClient, tracks);
+                uploaded++;
+            } catch (err) {
+                console.error(`Error subiendo ${file.name}:`, err);
+                errors++;
+            }
         }
+
+        // Guardar catálogo una sola vez al final
+        if (uploaded > 0) {
+            await saveCatalog(supabaseClient, tracks);
+        }
+
+        if (progressText) progressText.textContent = '';
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+
+        if (errors === 0) {
+            BSAlert(`✅ ${uploaded} pista${uploaded > 1 ? 's' : ''} subida${uploaded > 1 ? 's' : ''} correctamente.`);
+        } else {
+            BSAlert(`⚠️ ${uploaded} subida${uploaded > 1 ? 's' : ''}, ${errors} error${errors > 1 ? 'es' : ''}.`);
+        }
+
+        form.reset();
+        renderFileList(null);
     });
 }
 

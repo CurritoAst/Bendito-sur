@@ -1171,35 +1171,45 @@ export default function App() {
                     {/* === SECCIÓN CATÁLOGO === */}
                     <div id="admin-catalog" className="admin-section mt-2">
                         <div className="dashboard-section">
-                            <h3 className="dashboard-card-title mb-3"><i className="ph ph-music-notes-plus"></i> Subir Pista al Catálogo</h3>
-                            <form id="upload-track-form" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                    <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Archivo de Audio *</label>
-                                    <input type="file" id="track-file-input" accept="audio/*" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', cursor: 'pointer' }} />
+                            <h3 className="dashboard-card-title mb-3"><i className="ph ph-music-notes-plus"></i> Subir Pistas al Catálogo</h3>
+                            <form id="upload-track-form" style={{ marginBottom: '2rem' }}>
+                                {/* 1. Selector de archivos múltiple */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                                    <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Archivos de Audio *</label>
+                                    <input type="file" id="track-file-input" accept="audio/*" multiple style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', cursor: 'pointer' }} />
+                                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>Selecciona varios archivos a la vez. El título y artista se extraen del nombre del archivo (Artista - Título.wav)</span>
                                 </div>
-                                {[
-                                    { id: 'track-title', label: 'Título *', placeholder: 'Ej: Noches del Sur' },
-                                    { id: 'track-artist', label: 'Artista *', placeholder: 'Ej: DSJJ' },
-                                    { id: 'track-genre', label: 'Género', placeholder: 'Ej: Flamenco House' },
-                                    { id: 'track-bpm', label: 'BPM', placeholder: 'Ej: 124', type: 'number' },
-                                    { id: 'track-key', label: 'Key', placeholder: 'Ej: 7A' },
-                                ].map(f => (
-                                    <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                        <label htmlFor={f.id} style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{f.label}</label>
-                                        <input type={f.type || 'text'} id={f.id} placeholder={f.placeholder} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }} />
+
+                                {/* 2. Preview de archivos seleccionados */}
+                                <div id="upload-file-list" style={{ marginBottom: '1rem' }}></div>
+
+                                {/* 3. Campos compartidos: BPM, Key, Género, Acceso */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
+                                    {[
+                                        { id: 'track-genre', label: 'Género', placeholder: 'Ej: Flamenco House' },
+                                        { id: 'track-bpm', label: 'BPM', placeholder: 'Ej: 124', type: 'number' },
+                                        { id: 'track-key', label: 'Key', placeholder: 'Ej: 7A' },
+                                    ].map(f => (
+                                        <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                            <label htmlFor={f.id} style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{f.label}</label>
+                                            <input type={f.type || 'text'} id={f.id} placeholder={f.placeholder} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }} />
+                                        </div>
+                                    ))}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Acceso</label>
+                                        <select id="track-locked" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }}>
+                                            <option value="false">Libre</option>
+                                            <option value="true">Solo Elite</option>
+                                        </select>
                                     </div>
-                                ))}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                                    <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Acceso</label>
-                                    <select id="track-locked" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }}>
-                                        <option value="false">Libre</option>
-                                        <option value="true">Solo Elite</option>
-                                    </select>
                                 </div>
-                                <div style={{ gridColumn: '1 / -1' }}>
+
+                                {/* 4. Botón de subida */}
+                                <div>
                                     <button type="submit" className="btn btn-primary" id="upload-track-btn" style={{ background: 'var(--gold)', border: 'none', color: '#000', fontWeight: '700', minWidth: '180px' }}>
-                                        <i className="ph ph-upload-simple"></i> Subir Pista
+                                        <i className="ph ph-upload-simple"></i> Subir Pistas
                                     </button>
+                                    <span id="upload-progress-text" style={{ marginLeft: '1rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}></span>
                                 </div>
                             </form>
 
