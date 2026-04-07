@@ -774,32 +774,32 @@ export function initializeAppLogic() {
             submitBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Entrando...';
             submitBtn.style.pointerEvents = 'none';
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 submitBtn.innerHTML = originalText;
                 submitBtn.style.pointerEvents = 'auto';
-                
+
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
 
                 // Condición para Admin
                 if (email === 'admin@benditosur.es' && pass === 'admin123') {
                     UserSession.set('admin');
-                    recordAccess(supabaseClient, email, 'login', 'admin');
+                    await recordAccess(supabaseClient, email, 'login', 'admin');
                     const view = document.getElementById('admin-view');
                     if(view) view.classList.add('active');
                     BSAlert('🔓 Acceso concedido al panel del Administrador.');
                 } else if (email === 'collab@benditosur.es' && pass === 'collab') {
                     UserSession.set('collab');
-                    recordAccess(supabaseClient, email, 'login', 'collab');
+                    await recordAccess(supabaseClient, email, 'login', 'collab');
                     const view = document.getElementById('dashboard-view');
                     if(view) view.classList.add('active');
                     BSAlert('👑 Acceso vitalicio completado. Bienvenido, Colaborador Permanente.');
                 } else {
                     UserSession.set('user');
-                    recordAccess(supabaseClient, email, 'login', 'user');
+                    await recordAccess(supabaseClient, email, 'login', 'user');
                     const view = document.getElementById('dashboard-view');
                     if(view) view.classList.add('active');
                 }
-                
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 loginForm.reset();
                 setTimeout(() => {
@@ -825,23 +825,25 @@ export function initializeAppLogic() {
             submitBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Creando...';
             submitBtn.style.pointerEvents = 'none';
 
-            setTimeout(() => {
+            // Capturar datos ANTES del timeout (el form se resetea después)
+            const regName = document.getElementById('reg-name')?.value?.trim() || '';
+            const regEmail = document.getElementById('reg-email')?.value?.trim() || 'nuevo_usuario';
+            const regPlan = document.getElementById('reg-plan')?.value || 'pro';
+            const regProvince = document.getElementById('reg-province')?.value?.trim() || '';
+
+            setTimeout(async () => {
                 submitBtn.innerHTML = originalText;
                 submitBtn.style.pointerEvents = 'auto';
-                
+
                 UserSession.set('user');
-                const regName = document.getElementById('reg-name')?.value?.trim() || '';
-                const regEmail = document.getElementById('reg-email')?.value?.trim() || 'nuevo_usuario';
-                const regPlan = document.getElementById('reg-plan')?.value || 'pro';
-                const regProvince = document.getElementById('reg-province')?.value?.trim() || '';
-                recordAccess(supabaseClient, regEmail, 'registro', 'user');
-                registerUser(supabaseClient, regName, regEmail, regPlan, regProvince);
+                await recordAccess(supabaseClient, regEmail, 'registro', 'user');
+                await registerUser(supabaseClient, regName, regEmail, regPlan, regProvince);
                 BSAlert('✅ ¡Cuenta creada con éxito! Ya puedes escuchar lo mejor del sur.');
                 document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                
+
                 const view = document.getElementById('dashboard-view');
                 if(view) view.classList.add('active');
-                
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 registerForm.reset();
                 setTimeout(() => {
@@ -1622,11 +1624,21 @@ async function initCatalog(supabaseClient) {
 const SESSIONS_FILE = 'sessions.json';
 
 async function getPublicIP() {
-    try {
-        const res = await fetch('https://api.ipify.org?format=json');
-        const data = await res.json();
-        return data.ip;
-    } catch { return 'Desconocida'; }
+    const apis = [
+        { url: 'https://api.ipify.org?format=json', parse: d => d.ip },
+        { url: 'https://ipapi.co/json/', parse: d => d.ip },
+        { url: 'https://api.seeip.org/jsonip', parse: d => d.ip },
+    ];
+    for (const api of apis) {
+        try {
+            const res = await fetch(api.url, { signal: AbortSignal.timeout(3000) });
+            if (!res.ok) continue;
+            const data = await res.json();
+            const ip = api.parse(data);
+            if (ip) return ip;
+        } catch { /* try next */ }
+    }
+    return 'Desconocida';
 }
 
 function getBrowserInfo() {
