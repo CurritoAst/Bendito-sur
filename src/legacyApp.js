@@ -1254,7 +1254,7 @@ function renderAdminCatalogRow(track, sb, allTracks) {
         <td class="text-secondary">${track.bpm || '—'}</td>
         <td class="text-secondary">${track.key || '—'}</td>
         <td>${track.locked ? '<span class="format-badge">Elite</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Libre</span>'}</td>
-        <td><button class="btn-icon delete-track-btn" title="Eliminar" style="color:var(--red)"><i class="ph ph-trash"></i></button></td>`;
+        <td><button class="delete-track-btn" title="Eliminar" style="background:none;border:1px solid rgba(255,80,80,0.3);border-radius:4px;padding:4px 10px;color:#ff5050;font-size:0.9rem;cursor:pointer">🗑️</button></td>`;
     tr.querySelector('.delete-track-btn').addEventListener('click', () => {
         BSConfirm('¿Eliminar esta pista del catálogo?').then(async ok => {
             if (!ok) return;
