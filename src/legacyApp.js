@@ -1280,20 +1280,213 @@ function parseFileName(fileName) {
     return { artist: '', title: nameOnly.trim() };
 }
 
-function renderFileList(files) {
+// ─── AUDIO ANALYSIS: BPM + KEY DETECTION ────────────────────────────────────
+
+// Camelot wheel mapping: index 0=C … 11=B, major(B)/minor(A)
+const CAMELOT = {
+    major: ['8B','3B','10B','5B','12B','7B','2B','9B','4B','11B','6B','1B'],
+    minor: ['5A','12A','7A','2A','9A','4A','11A','6A','1A','8A','3A','10A']
+};
+
+// Krumhansl-Schmuckler key profiles
+const KEY_PROFILES = {
+    major: [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88],
+    minor: [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17]
+};
+
+function detectKey(audioBuffer) {
+    try {
+        const sampleRate = audioBuffer.sampleRate;
+        const data = audioBuffer.getChannelData(0);
+        // Use first 30s max
+        const len = Math.min(data.length, sampleRate * 30);
+        const fftSize = 4096;
+        const chroma = new Float32Array(12);
+
+        // Manual DFT for pitch class energy (simplified chromagram)
+        for (let bin = 0; bin < fftSize / 2; bin++) {
+            const freq = bin * sampleRate / fftSize;
+            if (freq < 60 || freq > 2000) continue;
+            // Which pitch class?
+            const midi = 12 * Math.log2(freq / 440) + 69;
+            const pitchClass = Math.round(midi) % 12;
+            if (pitchClass < 0) continue;
+
+            // Compute energy at this frequency using Goertzel-like approach over a few windows
+            let energy = 0;
+            const step = fftSize;
+            const numWindows = Math.min(Math.floor(len / step), 20);
+            for (let w = 0; w < numWindows; w++) {
+                let re = 0, im = 0;
+                const offset = w * step;
+                const omega = 2 * Math.PI * bin / fftSize;
+                for (let n = 0; n < fftSize && (offset + n) < len; n++) {
+                    re += data[offset + n] * Math.cos(omega * n);
+                    im += data[offset + n] * Math.sin(omega * n);
+                }
+                energy += re * re + im * im;
+            }
+            chroma[pitchClass] += energy / numWindows;
+        }
+
+        // Normalize chroma
+        const maxC = Math.max(...chroma);
+        if (maxC === 0) return null;
+        for (let i = 0; i < 12; i++) chroma[i] /= maxC;
+
+        // Correlate with key profiles
+        let bestKey = null, bestScore = -Infinity;
+        for (let shift = 0; shift < 12; shift++) {
+            for (const mode of ['major', 'minor']) {
+                let score = 0;
+                for (let i = 0; i < 12; i++) {
+                    score += chroma[(i + shift) % 12] * KEY_PROFILES[mode][i];
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestKey = CAMELOT[mode][shift];
+                }
+            }
+        }
+        return bestKey;
+    } catch { return null; }
+}
+
+function detectBPM(audioBuffer) {
+    try {
+        const sampleRate = audioBuffer.sampleRate;
+        const data = audioBuffer.getChannelData(0);
+        const len = Math.min(data.length, sampleRate * 30);
+
+        // Low-pass filter simulation: downsample to ~200Hz to focus on beats
+        const dsRate = 200;
+        const ratio = Math.floor(sampleRate / dsRate);
+        const dsLen = Math.floor(len / ratio);
+        const ds = new Float32Array(dsLen);
+        for (let i = 0; i < dsLen; i++) {
+            let sum = 0;
+            for (let j = 0; j < ratio; j++) sum += Math.abs(data[i * ratio + j]);
+            ds[i] = sum / ratio;
+        }
+
+        // Normalize
+        const maxVal = Math.max(...ds);
+        if (maxVal === 0) return null;
+        for (let i = 0; i < dsLen; i++) ds[i] /= maxVal;
+
+        // Peak detection
+        const threshold = 0.5;
+        const minDist = Math.floor(dsRate * 0.25); // min 0.25s between beats (240 BPM max)
+        const peaks = [];
+        for (let i = 1; i < dsLen - 1; i++) {
+            if (ds[i] > threshold && ds[i] > ds[i - 1] && ds[i] >= ds[i + 1]) {
+                if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minDist) {
+                    peaks.push(i);
+                }
+            }
+        }
+
+        if (peaks.length < 4) return null;
+
+        // Calculate intervals and find most common BPM
+        const intervals = [];
+        for (let i = 1; i < peaks.length; i++) {
+            intervals.push((peaks[i] - peaks[i - 1]) / dsRate);
+        }
+
+        // Histogram of BPM values (rounded to nearest integer)
+        const bpmCounts = {};
+        for (const interval of intervals) {
+            let bpm = Math.round(60 / interval);
+            // Normalize to 60-180 range
+            while (bpm > 180) bpm = Math.round(bpm / 2);
+            while (bpm < 60) bpm *= 2;
+            bpmCounts[bpm] = (bpmCounts[bpm] || 0) + 1;
+        }
+
+        // Find BPM with most votes (include neighbors ±1)
+        let bestBPM = null, bestCount = 0;
+        for (const [bpm, count] of Object.entries(bpmCounts)) {
+            const b = parseInt(bpm);
+            const total = count + (bpmCounts[b - 1] || 0) + (bpmCounts[b + 1] || 0);
+            if (total > bestCount) {
+                bestCount = total;
+                bestBPM = b;
+            }
+        }
+
+        return bestBPM;
+    } catch { return null; }
+}
+
+async function analyzeAudioFile(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const bpm = detectBPM(audioBuffer);
+        const key = detectKey(audioBuffer);
+        audioCtx.close();
+        return { bpm, key };
+    } catch (err) {
+        console.warn('Audio analysis failed for', file.name, err);
+        return { bpm: null, key: null };
+    }
+}
+
+// Store per-file analysis results
+let fileAnalysis = [];
+
+function renderFileList(files, analysisResults) {
     const container = document.getElementById('upload-file-list');
     if (!container) return;
-    if (!files || files.length === 0) { container.innerHTML = ''; return; }
+    if (!files || files.length === 0) { container.innerHTML = ''; fileAnalysis = []; return; }
     const rows = Array.from(files).map((f, i) => {
         const { artist, title } = parseFileName(f.name);
-        return `<div style="display:flex;align-items:center;gap:0.8rem;padding:0.5rem 0.7rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:3px;margin-bottom:4px">
+        const a = (analysisResults && analysisResults[i]) || {};
+        const bpmVal = a.bpm || '';
+        const keyVal = a.key || '';
+        const analyzing = !analysisResults || !analysisResults[i];
+        return `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.7rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:3px;margin-bottom:4px;flex-wrap:wrap" data-file-idx="${i}">
             <span style="color:#f3c948;font-size:0.8rem;min-width:22px">${i + 1}.</span>
-            <span style="color:#fff;font-size:0.85rem;flex:1">${title}</span>
-            <span style="color:rgba(255,255,255,0.4);font-size:0.8rem">${artist || 'Sin artista'}</span>
-            <span style="color:rgba(255,255,255,0.2);font-size:0.7rem">${(f.size / 1048576).toFixed(1)} MB</span>
+            <span style="color:#fff;font-size:0.85rem;flex:1;min-width:120px">${title}</span>
+            <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;min-width:80px">${artist || 'Sin artista'}</span>
+            <span style="color:rgba(255,255,255,0.2);font-size:0.7rem;min-width:45px">${(f.size / 1048576).toFixed(1)} MB</span>
+            <input type="number" class="file-bpm" data-idx="${i}" value="${bpmVal}" placeholder="${analyzing ? '...' : 'BPM'}" style="width:55px;background:rgba(255,255,255,0.06);border:1px solid rgba(243,201,72,0.3);border-radius:3px;padding:3px 6px;color:#f3c948;font-size:0.78rem;text-align:center;outline:none" />
+            <input type="text" class="file-key" data-idx="${i}" value="${keyVal}" placeholder="${analyzing ? '...' : 'Key'}" style="width:45px;background:rgba(255,255,255,0.06);border:1px solid rgba(243,201,72,0.3);border-radius:3px;padding:3px 6px;color:#f3c948;font-size:0.78rem;text-align:center;outline:none" />
         </div>`;
     }).join('');
-    container.innerHTML = `<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:0.4rem">${files.length} archivo${files.length > 1 ? 's' : ''} seleccionado${files.length > 1 ? 's' : ''}</div>${rows}`;
+    container.innerHTML = `<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:0.4rem">${files.length} archivo${files.length > 1 ? 's' : ''} — analizando audio...</div>${rows}`;
+}
+
+async function analyzeAndRenderFiles(files) {
+    fileAnalysis = new Array(files.length).fill(null);
+    renderFileList(files, fileAnalysis);
+
+    const container = document.getElementById('upload-file-list');
+    let analyzed = 0;
+
+    for (let i = 0; i < files.length; i++) {
+        const result = await analyzeAudioFile(files[i]);
+        fileAnalysis[i] = result;
+        analyzed++;
+
+        // Update individual row inputs
+        const bpmInput = container.querySelector(`.file-bpm[data-idx="${i}"]`);
+        const keyInput = container.querySelector(`.file-key[data-idx="${i}"]`);
+        if (bpmInput && result.bpm) { bpmInput.value = result.bpm; bpmInput.placeholder = 'BPM'; }
+        if (keyInput && result.key) { keyInput.value = result.key; keyInput.placeholder = 'Key'; }
+        if (bpmInput && !result.bpm) bpmInput.placeholder = 'BPM';
+        if (keyInput && !result.key) keyInput.placeholder = 'Key';
+
+        // Update header
+        const header = container.querySelector('div');
+        if (header && analyzed < files.length) {
+            header.textContent = `${files.length} archivos — analizado ${analyzed} de ${files.length}...`;
+        } else if (header) {
+            header.textContent = `${files.length} archivo${files.length > 1 ? 's' : ''} listo${files.length > 1 ? 's' : ''}`;
+        }
+    }
 }
 
 async function initCatalog(supabaseClient) {
@@ -1306,10 +1499,10 @@ async function initCatalog(supabaseClient) {
         renderAdminCatalogRow(t, supabaseClient, tracks);
     });
 
-    // Preview de archivos seleccionados
+    // Preview + análisis automático de archivos seleccionados
     const fileInput = document.getElementById('track-file-input');
     if (fileInput) {
-        fileInput.addEventListener('change', () => renderFileList(fileInput.files));
+        fileInput.addEventListener('change', () => analyzeAndRenderFiles(fileInput.files));
     }
 
     // Formulario de subida múltiple
@@ -1321,12 +1514,11 @@ async function initCatalog(supabaseClient) {
         const btn = document.getElementById('upload-track-btn');
         const progressText = document.getElementById('upload-progress-text');
         const files = fileInput.files;
+        const container = document.getElementById('upload-file-list');
 
         if (!files || files.length === 0) { BSAlert('⚠️ Selecciona al menos un archivo de audio.'); return; }
 
         const genre = document.getElementById('track-genre').value.trim();
-        const bpm = document.getElementById('track-bpm').value.trim();
-        const key = document.getElementById('track-key').value.trim();
         const locked = document.getElementById('track-locked').value === 'true';
 
         const originalText = btn.innerHTML;
@@ -1340,6 +1532,12 @@ async function initCatalog(supabaseClient) {
             const file = files[i];
             const { artist, title } = parseFileName(file.name);
             if (progressText) progressText.textContent = `Subiendo ${i + 1} de ${files.length}: ${title}`;
+
+            // Leer BPM y Key del input individual de cada fila (auto-detectado o editado por el usuario)
+            const bpmInput = container && container.querySelector(`.file-bpm[data-idx="${i}"]`);
+            const keyInput = container && container.querySelector(`.file-key[data-idx="${i}"]`);
+            const fileBpm = bpmInput ? bpmInput.value.trim() : '';
+            const fileKey = keyInput ? keyInput.value.trim() : '';
 
             try {
                 const safeName = file.name
@@ -1358,8 +1556,8 @@ async function initCatalog(supabaseClient) {
                     title: title || file.name,
                     artist: artist || '',
                     genre,
-                    bpm: bpm || null,
-                    key: key || null,
+                    bpm: fileBpm || null,
+                    key: fileKey || null,
                     locked,
                     audio_url: urlData.publicUrl
                 };

@@ -1185,16 +1185,10 @@ export default function App() {
 
                                 {/* 3. Campos compartidos: BPM, Key, Género, Acceso */}
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
-                                    {[
-                                        { id: 'track-genre', label: 'Género', placeholder: 'Ej: Flamenco House' },
-                                        { id: 'track-bpm', label: 'BPM', placeholder: 'Ej: 124', type: 'number' },
-                                        { id: 'track-key', label: 'Key', placeholder: 'Ej: 7A' },
-                                    ].map(f => (
-                                        <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                            <label htmlFor={f.id} style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{f.label}</label>
-                                            <input type={f.type || 'text'} id={f.id} placeholder={f.placeholder} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }} />
-                                        </div>
-                                    ))}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label htmlFor="track-genre" style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Género</label>
+                                        <input type="text" id="track-genre" placeholder="Ej: Flamenco House" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }} />
+                                    </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                         <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Acceso</label>
                                         <select id="track-locked" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }}>
@@ -1203,6 +1197,7 @@ export default function App() {
                                         </select>
                                     </div>
                                 </div>
+                                <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', marginBottom: '0.8rem' }}>BPM y Key se detectan automáticamente del audio. Puedes editarlos en la lista antes de subir.</p>
 
                                 {/* 4. Botón de subida */}
                                 <div>
