@@ -773,6 +773,8 @@ export function initializeAppLogic() {
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session) {
                 const email = session.user?.email || '';
+                const provider = session.user?.app_metadata?.provider || '';
+                const meta = session.user?.user_metadata || {};
                 let isAllowed = false;
 
                 if (email === 'admin@benditosur.es') {
@@ -789,6 +791,16 @@ export function initializeAppLogic() {
                         if (userFound) {
                             UserSession.set('user');
                             isAllowed = true;
+                        } else if (provider === 'google' || provider === 'spotify') {
+                            // Auto-registro: usuario que llega por OAuth y no existe todavía
+                            const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Usuario');
+                            try {
+                                await registerUser(supabaseClient, displayName, email, 'pro', '');
+                                await recordAccess(supabaseClient, email, 'registro', 'user');
+                            } catch (e) { console.warn('Error en auto-registro OAuth:', e); }
+                            UserSession.set('user');
+                            isAllowed = true;
+                            BSAlert(`✅ ¡Bienvenido/a a Bendito Sur, ${displayName}!`);
                         }
                     } catch(e) { console.error('Error cargando usuarios permitidos:', e); }
                 }
