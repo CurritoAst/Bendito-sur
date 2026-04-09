@@ -5,6 +5,44 @@ import { initializeAppLogic } from './legacyApp.js';
 
 export default function App() {
     useEffect(() => {
+        // Pantalla de bloqueo
+        const lockOverlay = document.getElementById('site-lock-overlay');
+        const LOCK_PASSWORD = 'CurritoPan24demarzo';
+
+        const unlock = () => {
+            sessionStorage.setItem('bs_unlocked', 'true');
+            if (lockOverlay) {
+                lockOverlay.style.opacity = '0';
+                setTimeout(() => { lockOverlay.style.display = 'none'; }, 500);
+            }
+        };
+
+        if (sessionStorage.getItem('bs_unlocked') === 'true' || localStorage.getItem('benditoSession')) {
+            if (lockOverlay) lockOverlay.style.display = 'none';
+        }
+
+        const lockBtn = document.getElementById('site-lock-btn');
+        const lockPassword = document.getElementById('site-lock-password');
+        const lockHint = document.getElementById('site-lock-hint');
+
+        const tryUnlock = () => {
+            if (lockPassword && lockPassword.value === LOCK_PASSWORD) {
+                unlock();
+            } else if (lockHint) {
+                lockHint.style.opacity = '1';
+                if (lockPassword) {
+                    lockPassword.style.borderColor = 'rgba(231,76,60,0.6)';
+                    setTimeout(() => {
+                        lockPassword.style.borderColor = 'rgba(247,168,0,0.3)';
+                        lockHint.style.opacity = '0';
+                    }, 2000);
+                }
+            }
+        };
+
+        if (lockBtn) lockBtn.addEventListener('click', tryUnlock);
+        if (lockPassword) lockPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+
         // Ejecutar lógica antigua sobre el DOM una vez montado
         try { initializeAppLogic(); } catch(e) { console.error('App init error:', e); }
 
@@ -18,6 +56,54 @@ export default function App() {
 
     return (
         <>
+            {/* === PANTALLA DE BLOQUEO === */}
+            <div id="site-lock-overlay" style={{
+                position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                background: 'radial-gradient(ellipse at center, #0d0d0d 0%, #000000 100%)',
+                zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexDirection: 'column', transition: 'opacity 0.5s ease'
+            }}>
+                <div style={{
+                    textAlign: 'center', maxWidth: '420px', padding: '3rem 2rem',
+                    border: '1px solid rgba(247,168,0,0.2)', borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)'
+                }}>
+                    <div style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem' }}>
+                        BENDITO<em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '1px #f3c948' }}>SUR.</em>
+                    </div>
+                    <div style={{
+                        fontSize: '0.7rem', letterSpacing: '4px', textTransform: 'uppercase',
+                        color: '#f3c948', marginBottom: '1.5rem', fontWeight: 600
+                    }}>Web en Desarrollo</div>
+                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.6', fontStyle: 'italic' }}>
+                        Dentro de poco sabréis muchas cosas...
+                    </p>
+                    <input
+                        id="site-lock-password"
+                        type="password"
+                        placeholder="Contraseña"
+                        style={{
+                            width: '100%', padding: '0.75rem 1rem', marginBottom: '0.75rem',
+                            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(247,168,0,0.3)',
+                            borderRadius: '2px', color: '#fff', fontSize: '1rem',
+                            letterSpacing: '2px', outline: 'none', boxSizing: 'border-box',
+                            fontFamily: 'inherit'
+                        }}
+                    />
+                    <button id="site-lock-btn" style={{
+                        width: '100%', padding: '0.85rem 1.5rem',
+                        background: 'transparent', border: '1px solid rgba(247,168,0,0.4)',
+                        color: '#f3c948', fontFamily: 'Bebas Neue, sans-serif',
+                        fontSize: '1.1rem', letterSpacing: '4px', cursor: 'pointer',
+                        borderRadius: '2px', transition: 'all 0.2s'
+                    }}>ACCEDER →</button>
+                    <p id="site-lock-hint" style={{ color: '#e74c3c', fontSize: '0.75rem', marginTop: '0.75rem', letterSpacing: '1px', opacity: 0, transition: 'opacity 0.2s', minHeight: '1.2em' }}>Contraseña incorrecta</p>
+                    <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', marginTop: '0.75rem', letterSpacing: '1px' }}>
+                        Solo personal autorizado · benditosur.es
+                    </p>
+                </div>
+            </div>
+
             {/* === MODAL CUSTOM === */}
             <div id="bs-modal-overlay" style={{
                 position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
