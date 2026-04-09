@@ -815,9 +815,10 @@ export function initializeAppLogic() {
 
     // Renderización de Google Identity Services nativo (By-pass Supabase Redirect)
     const renderGoogleBtn = () => {
-        const container = document.getElementById('google-login-container');
-        if (!container || !supabaseClient || !window.google) return;
-        
+        const loginContainer = document.getElementById('google-login-container');
+        const registerContainer = document.getElementById('google-register-container');
+        if ((!loginContainer && !registerContainer) || !supabaseClient || !window.google) return;
+
         window.google.accounts.id.initialize({
             client_id: '84844867888-upkc3dn6pafhu7sb3f91c7s417ugf3ql.apps.googleusercontent.com',
             callback: async (response) => {
@@ -834,13 +835,12 @@ export function initializeAppLogic() {
                 }
             }
         });
-        window.google.accounts.id.renderButton(
-            container,
-            { theme: 'filled_black', size: 'large', type: 'standard', shape: 'rectangular', text: 'continue_with' }
-        );
+        const btnOptions = { theme: 'filled_black', size: 'large', type: 'standard', shape: 'rectangular', text: 'continue_with' };
+        if (loginContainer) window.google.accounts.id.renderButton(loginContainer, btnOptions);
+        if (registerContainer) window.google.accounts.id.renderButton(registerContainer, { ...btnOptions, text: 'signup_with' });
     };
 
-    if (document.getElementById('google-login-container')) {
+    if (document.getElementById('google-login-container') || document.getElementById('google-register-container')) {
         if (!window.google) {
             const script = document.createElement('script');
             script.src = 'https://accounts.google.com/gsi/client';

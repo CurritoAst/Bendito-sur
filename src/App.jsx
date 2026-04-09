@@ -267,6 +267,7 @@ export default function App() {
 
                             <div className="social-logins pb-3">
                                 <button type="button" className="btn btn-social"><i className="ph-fill ph-spotify-logo" style={{ "color": "#1ED760" }}></i> Registrarse con Spotify</button>
+                                <div id="google-register-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}></div>
                             </div>
                             <div className="auth-divider"><span>Crear cuenta clásica</span></div>
 
