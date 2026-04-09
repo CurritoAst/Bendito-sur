@@ -903,38 +903,37 @@ export default function App() {
 
                 <div className="dashboard-grid">
 
-                    
+
                     <div className="dashboard-card">
                         <h3 className="dashboard-card-title"><i className="ph ph-star"></i> Mi Suscripcion</h3>
                         <div className="sub-status">
-                            <span className="status-badge active">Activa</span>
-                            <div className="sub-plan">ELITE</div>
-                            <p className="sub-renewal">Proxima renovacion: 15 de Octubre, 2026</p>
+                            <span className="status-badge" id="user-plan-badge">Sin plan</span>
+                            <div className="sub-plan" id="user-plan-name">FREE</div>
+                            <p className="sub-renewal" id="user-plan-renewal">Sin suscripcion activa</p>
                         </div>
                         <div className="dashboard-actions">
-                            <button className="btn btn-outline btn-sm">Cambiar Plan</button>
-                            <button className="btn btn-outline btn-sm" style={{ "borderColor": "var(--red)", "color": "var(--red)" }}>Cancelar</button>
+                            <button className="btn btn-outline btn-sm">Elegir Plan</button>
                         </div>
                     </div>
 
-                    
+
                     <div className="dashboard-card">
                         <h3 className="dashboard-card-title"><i className="ph ph-chart-bar"></i> Actividad</h3>
                         <div className="stats-grid">
                             <div className="stat-item">
-                                <div className="stat-value">142</div>
+                                <div className="stat-value" id="user-stat-downloads">0</div>
                                 <div className="stat-label">Descargas</div>
                             </div>
                             <div className="stat-item">
-                                <div className="stat-value">56</div>
+                                <div className="stat-value" id="user-stat-favorites">0</div>
                                 <div className="stat-label">Favoritas</div>
                             </div>
                             <div className="stat-item">
-                                <div className="stat-value">8</div>
+                                <div className="stat-value" id="user-stat-uploads">0</div>
                                 <div className="stat-label">Sets Subidos</div>
                             </div>
                             <div className="stat-item">
-                                <div className="stat-value">3</div>
+                                <div className="stat-value" id="user-stat-months">0</div>
                                 <div className="stat-label">Meses Activo</div>
                             </div>
                         </div>
@@ -955,7 +954,7 @@ export default function App() {
                     <p className="text-secondary" style={{ "fontSize": "0.9rem", "marginBottom": "0" }}>Sube tus ediciones exclusivas o stems en formato WAV/FLAC, o descarga un backup de tu discografía.</p>
                 </div>
 
-                
+
                 <div className="dashboard-section mt-4">
                     <h3 className="dashboard-card-title">Historial de Descargas</h3>
                     <div className="library-table-container">
@@ -969,27 +968,9 @@ export default function App() {
                                     <th></th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="user-downloads-tbody">
                                 <tr>
-                                    <td className="text-secondary">03 Oct 2026</td>
-                                    <td className="font-medium">Deep Signals</td>
-                                    <td className="text-secondary">Nina Kraviz (Edit)</td>
-                                    <td><span className="format-badge">WAV</span></td>
-                                    <td><button className="btn-icon" title="Volver a descargar"><i className="ph ph-download-simple"></i></button></td>
-                                </tr>
-                                <tr>
-                                    <td className="text-secondary">01 Oct 2026</td>
-                                    <td className="font-medium">Groove Elements</td>
-                                    <td className="text-secondary">Marco Carola</td>
-                                    <td><span className="format-badge">FLAC</span></td>
-                                    <td><button className="btn-icon" title="Volver a descargar"><i className="ph ph-download-simple"></i></button></td>
-                                </tr>
-                                <tr>
-                                    <td className="text-secondary">28 Sep 2026</td>
-                                    <td className="font-medium">Noches del Sur</td>
-                                    <td className="text-secondary">DSJJ</td>
-                                    <td><span className="format-badge">WAV</span></td>
-                                    <td><button className="btn-icon" title="Volver a descargar"><i className="ph ph-download-simple"></i></button></td>
+                                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '2px' }}>AÚN NO HAS DESCARGADO NINGUNA PISTA</td>
                                 </tr>
                             </tbody>
                         </table>

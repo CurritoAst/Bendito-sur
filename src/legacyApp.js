@@ -803,8 +803,10 @@ export function initializeAppLogic() {
                             BSAlert(`✅ ¡Bienvenido/a a Bendito Sur, ${displayName}!`);
                             // Fire-and-forget: el registro en users.json se hace en background
                             // para no bloquear el redirect al dashboard
+                            // Plan 'free' por defecto: el usuario empezara con la cuenta a 0
+                            // hasta que contrate un plan real
                             Promise.allSettled([
-                                registerUser(supabaseClient, displayName, email, 'pro', ''),
+                                registerUser(supabaseClient, displayName, email, 'free', ''),
                                 recordAccess(supabaseClient, email, 'registro', 'user')
                             ]).then(results => {
                                 console.log('[Auth] Auto-registro background completado', results);
