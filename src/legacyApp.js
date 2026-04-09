@@ -37,6 +37,13 @@ function BSConfirm(message) { return _bsShowModal(message, '⚠️', true); }
 /** @type {any} */ (window).BSConfirm = BSConfirm;
 
 export function initializeAppLogic() {
+    let supabaseClient = null;
+    try {
+        if (window.supabase && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_URL !== '') {
+            supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        }
+    } catch(e) { console.warn('Supabase init failed:', e.message); }
+
     // 1. Navigation Logic (SPA Routing)
     const navItems = document.querySelectorAll('.nav-item');
     const views = document.querySelectorAll('.view');
@@ -761,6 +768,57 @@ export function initializeAppLogic() {
         });
     });
 
+    // Auth State Listener para Login de Google y Sesiones
+    if (supabaseClient) {
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                const email = session.user?.email || '';
+                if (email === 'admin@benditosur.es') {
+                    UserSession.set('admin');
+                } else if (email === 'collab@benditosur.es') {
+                    UserSession.set('collab');
+                } else {
+                    UserSession.set('user');
+                }
+                
+                const authView = document.getElementById('auth-view');
+                if (authView && authView.classList.contains('active')) {
+                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                    const dbView = document.getElementById(UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view');
+                    if (dbView) dbView.classList.add('active');
+                }
+            } else if (event === 'SIGNED_OUT') {
+                UserSession.clear();
+            }
+        });
+    }
+
+    // Lógica de Submit LOGIN (Google)
+    const googleLoginBtn = document.getElementById('google-login-btn');
+    if (googleLoginBtn && supabaseClient) {
+        googleLoginBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const originalText = googleLoginBtn.innerHTML;
+            googleLoginBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Conectando...';
+            googleLoginBtn.style.pointerEvents = 'none';
+
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                if (error) throw error;
+            } catch (err) {
+                console.error(err);
+                BSAlert('❌ Error iniciando sesión con Google.');
+                googleLoginBtn.innerHTML = originalText;
+                googleLoginBtn.style.pointerEvents = 'auto';
+            }
+        });
+    }
+
     // Lógica de Submit LOGIN
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
@@ -1119,13 +1177,7 @@ export function initializeAppLogic() {
     const collabImportBtn = document.getElementById('collab-import-btn');
     const collabFileInput = document.getElementById('collab-file-input');
 
-    // Inicializamos cliente Supabase de forma global para estas funciones
-    let supabaseClient = null;
-    try {
-        if (window.supabase && CONFIG.SUPABASE_URL && CONFIG.SUPABASE_URL !== '') {
-            supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-        }
-    } catch(e) { console.warn('Supabase init failed:', e.message); }
+    // Cliente Supabase ya inicializado arriba
 
     if (collabExportBtn) {
         collabExportBtn.addEventListener('click', async () => {
