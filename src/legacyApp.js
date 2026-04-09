@@ -771,10 +771,12 @@ export function initializeAppLogic() {
     // Auth State Listener para Login de Google, Spotify y Sesiones
     if (supabaseClient) {
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            console.log('[Auth] Event:', event, 'Session:', !!session);
             if (event === 'SIGNED_IN' && session) {
                 const email = session.user?.email || '';
                 const provider = session.user?.app_metadata?.provider || '';
                 const meta = session.user?.user_metadata || {};
+                console.log('[Auth] SIGNED_IN:', { email, provider });
                 let isAllowed = false;
 
                 if (email === 'admin@benditosur.es') {
@@ -789,11 +791,13 @@ export function initializeAppLogic() {
                         const usersList = await loadUsers(supabaseClient);
                         const userFound = usersList.find(u => u.email.toLowerCase() === email.toLowerCase());
                         if (userFound) {
+                            console.log('[Auth] Usuario existente encontrado');
                             UserSession.set('user');
                             isAllowed = true;
                         } else if (provider === 'google' || provider === 'spotify') {
                             // Auto-registro: usuario que llega por OAuth y no existe todavía
                             const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Usuario');
+                            console.log('[Auth] Auto-registrando usuario OAuth:', displayName);
                             try {
                                 await registerUser(supabaseClient, displayName, email, 'pro', '');
                                 await recordAccess(supabaseClient, email, 'registro', 'user');
@@ -801,21 +805,29 @@ export function initializeAppLogic() {
                             UserSession.set('user');
                             isAllowed = true;
                             BSAlert(`✅ ¡Bienvenido/a a Bendito Sur, ${displayName}!`);
+                        } else {
+                            console.warn('[Auth] Usuario no encontrado y provider no es OAuth:', provider);
                         }
                     } catch(e) { console.error('Error cargando usuarios permitidos:', e); }
                 }
 
                 if (!isAllowed) {
+                    console.warn('[Auth] Acceso denegado para:', email);
                     await supabaseClient.auth.signOut();
                     UserSession.clear();
                     BSAlert(`❌ Acceso denegado: el correo ${email} no está registrado en Bendito Sur. Contacta con nosotros para obtener acceso.`);
                     return;
                 }
-                
-                const currentView = document.querySelector('.view.active');
-                if (currentView && currentView.id !== 'dashboard-view' && currentView.id !== 'admin-view') {
+
+                // Redirección incondicional al dashboard correspondiente
+                const targetViewId = UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view';
+                console.log('[Auth] Redirigiendo a:', targetViewId);
+                try {
+                    navigateTo(targetViewId);
+                } catch (e) {
+                    console.error('[Auth] Error en navigateTo, fallback manual:', e);
                     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                    const dbView = document.getElementById(UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view');
+                    const dbView = document.getElementById(targetViewId);
                     if (dbView) dbView.classList.add('active');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
@@ -826,24 +838,41 @@ export function initializeAppLogic() {
     }
 
     // Renderización de Google Identity Services nativo (By-pass Supabase Redirect)
-    const renderGoogleBtn = () => {
+    // Generamos nonce aleatorio + hash SHA-256 (Supabase exige nonce match al validar el ID token)
+    const generateNonce = async () => {
+        const raw = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+        const encoder = new TextEncoder();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(raw));
+        const hashed = Array.from(new Uint8Array(hashBuffer))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+        return { raw, hashed };
+    };
+
+    const renderGoogleBtn = async () => {
         const loginContainer = document.getElementById('google-login-container');
         const registerContainer = document.getElementById('google-register-container');
         if ((!loginContainer && !registerContainer) || !supabaseClient || !window.google) return;
 
+        const { raw: rawNonce, hashed: hashedNonce } = await generateNonce();
+        console.log('[GSI] Inicializando con nonce');
+
         window.google.accounts.id.initialize({
             client_id: '84844867888-upkc3dn6pafhu7sb3f91c7s417ugf3ql.apps.googleusercontent.com',
+            nonce: hashedNonce,
             callback: async (response) => {
+                console.log('[GSI] Credential recibido, llamando a Supabase signInWithIdToken');
                 try {
-                    const { error } = await supabaseClient.auth.signInWithIdToken({
+                    const { data, error } = await supabaseClient.auth.signInWithIdToken({
                         provider: 'google',
                         token: response.credential,
+                        nonce: rawNonce,
                     });
                     if (error) throw error;
-                    // El onAuthStateChange listener se encargará de la redirección
+                    console.log('[GSI] signInWithIdToken OK, esperando SIGNED_IN event', !!data?.session);
                 } catch (err) {
-                    console.error('Error Google ID Token:', err);
-                    BSAlert('❌ Error iniciando sesión con Google (Token inválido).');
+                    console.error('[GSI] Error Google ID Token:', err);
+                    BSAlert('❌ Error iniciando sesión con Google: ' + (err?.message || 'Token inválido'));
                 }
             }
         });
