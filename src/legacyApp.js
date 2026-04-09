@@ -800,11 +800,12 @@ export function initializeAppLogic() {
                     return;
                 }
                 
-                const authView = document.getElementById('auth-view');
-                if (authView && authView.classList.contains('active')) {
+                const currentView = document.querySelector('.view.active');
+                if (currentView && currentView.id !== 'dashboard-view' && currentView.id !== 'admin-view') {
                     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
                     const dbView = document.getElementById(UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view');
                     if (dbView) dbView.classList.add('active');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             } else if (event === 'SIGNED_OUT') {
                 UserSession.clear();
