@@ -798,13 +798,17 @@ export function initializeAppLogic() {
                             // Auto-registro: usuario que llega por OAuth y no existe todavía
                             const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Usuario');
                             console.log('[Auth] Auto-registrando usuario OAuth:', displayName);
-                            try {
-                                await registerUser(supabaseClient, displayName, email, 'pro', '');
-                                await recordAccess(supabaseClient, email, 'registro', 'user');
-                            } catch (e) { console.warn('Error en auto-registro OAuth:', e); }
                             UserSession.set('user');
                             isAllowed = true;
                             BSAlert(`✅ ¡Bienvenido/a a Bendito Sur, ${displayName}!`);
+                            // Fire-and-forget: el registro en users.json se hace en background
+                            // para no bloquear el redirect al dashboard
+                            Promise.allSettled([
+                                registerUser(supabaseClient, displayName, email, 'pro', ''),
+                                recordAccess(supabaseClient, email, 'registro', 'user')
+                            ]).then(results => {
+                                console.log('[Auth] Auto-registro background completado', results);
+                            });
                         } else {
                             console.warn('[Auth] Usuario no encontrado y provider no es OAuth:', provider);
                         }
