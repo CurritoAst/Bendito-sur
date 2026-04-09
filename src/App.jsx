@@ -303,31 +303,15 @@ export default function App() {
                                 <input type="email" id="reg-email" placeholder=" " required />
                                 <label>Correo Electrónico</label>
                             </div>
-                            <div className="form-group-premium">
+                            <div className="form-group-premium" style={{ "marginBottom": "2.5rem" }}>
                                 <input type="password" id="reg-password" placeholder=" " required />
                                 <label>Crear Contraseña Fuerte</label>
                             </div>
 
-                            <div className="auth-divider"><span>Elige tu Plan</span></div>
-
-                            <div className="form-group-premium">
-                                <select id="reg-plan" required style={{ "background": "transparent", "border": "1px solid rgba(255, 255, 255, 0.1)", "color": "#fff", "width": "100%", "padding": "1.2rem 1rem", "borderRadius": "4px", "outline": "none", "marginBottom": "1rem", "appearance": "none", "WebkitAppearance": "none" }}>
-                                    <option value="" disabled selected style={{ "color": "#000" }}>Nivel de Acceso (Requerido)</option>
-                                    <option value="pro" style={{ "color": "#000" }}>Suscripción PRO</option>
-                                    <option value="elite" style={{ "color": "#000" }}>Suscripción ELITE</option>
-                                </select>
-                            </div>
-                            
-                            <div className="form-group-premium" style={{ "marginBottom": "2.5rem" }}>
-                                <select id="reg-billing" required style={{ "background": "transparent", "border": "1px solid rgba(255, 255, 255, 0.1)", "color": "#fff", "width": "100%", "padding": "1.2rem 1rem", "borderRadius": "4px", "outline": "none", "appearance": "none", "WebkitAppearance": "none" }}>
-                                    <option value="" disabled selected style={{ "color": "#000" }}>Ciclo de Facturación (Requerido)</option>
-                                    <option value="mensual" style={{ "color": "#000" }}>Mensual</option>
-                                    <option value="trimestral" style={{ "color": "#000" }}>Trimestral (Ahorra un 10%)</option>
-                                    <option value="semestral" style={{ "color": "#000" }}>Semestral (Ahorra un 15%)</option>
-                                    <option value="anual" style={{ "color": "#000" }}>Anual (Ahorra un 20%)</option>
-                                </select>
-                            </div>
-                            <button type="submit" className="btn btn-primary w-100 btn-lg">Solicitar Acceso y Pagar</button>
+                            <p style={{ "fontSize": "0.78rem", "color": "rgba(255,255,255,0.45)", "textAlign": "center", "marginBottom": "1.5rem", "lineHeight": "1.5" }}>
+                                Crea tu cuenta <span style={{ "color": "var(--gold)", "fontWeight": "600" }}>gratis</span>. Luego podrás elegir un plan PRO o ELITE desde tu perfil cuando quieras.
+                            </p>
+                            <button type="submit" className="btn btn-primary w-100 btn-lg">Crear Cuenta Gratis</button>
                         </form>
                     </div>
                 </div>
@@ -487,7 +471,7 @@ export default function App() {
                             <li className="disabled"><i className="ph ph-x-circle"></i> Acceso anticipado a Promos</li>
                             <li className="disabled"><i className="ph ph-x-circle"></i> Canal privado en comunidad</li>
                         </ul>
-                        <button className="btn btn-outline btn-lg w-100">Seleccionar Pro</button>
+                        <button className="btn btn-outline btn-lg w-100 plan-select-btn" data-plan="pro">Seleccionar Pro</button>
                     </div>
 
                     
@@ -509,7 +493,7 @@ export default function App() {
                             <li><i className="ph-fill ph-check-circle"></i> Acceso anticipado a Promos</li>
                             <li><i className="ph-fill ph-check-circle"></i> Canal privado en comunidad</li>
                         </ul>
-                        <button className="btn btn-primary btn-lg w-100">Seleccionar Elite</button>
+                        <button className="btn btn-primary btn-lg w-100 plan-select-btn" data-plan="elite">Seleccionar Elite</button>
                     </div>
                 </div>
 
@@ -932,7 +916,7 @@ export default function App() {
                             <p className="sub-renewal" id="user-plan-renewal">Sin suscripcion activa</p>
                         </div>
                         <div className="dashboard-actions">
-                            <button className="btn btn-outline btn-sm">Elegir Plan</button>
+                            <button className="btn btn-outline btn-sm" id="dashboard-choose-plan-btn">Elegir Plan</button>
                         </div>
                     </div>
 

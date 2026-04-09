@@ -844,6 +844,25 @@ export function initializeAppLogic() {
                     } else {
                         BSAlert(`👋 ¡Hola de nuevo, ${displayName}!`);
                     }
+
+                    // Si el usuario habia elegido un plan antes de registrarse,
+                    // se le aplica automaticamente y se le lleva a la pagina de planes
+                    const pendingPlan = sessionStorage.getItem('bs_pending_plan');
+                    if (pendingPlan && UserSession.get() === 'user') {
+                        sessionStorage.removeItem('bs_pending_plan');
+                        try {
+                            const users = await loadUsers(supabaseClient);
+                            const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+                            if (idx !== -1) {
+                                users[idx].plan = pendingPlan;
+                                await saveUsers(supabaseClient, users);
+                            }
+                        } catch (e) { console.warn('Error aplicando plan pendiente:', e); }
+                        BSAlert(`💳 Tu plan ${pendingPlan.toUpperCase()} esta listo. En breve te contactaremos para completar el pago.`);
+                        try { navigateTo('pricing-view'); } catch (e) { console.error(e); }
+                        return;
+                    }
+
                     const targetViewId = UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view';
                     console.log('[Auth] Redirigiendo a:', targetViewId);
                     try {
@@ -1038,27 +1057,27 @@ export function initializeAppLogic() {
             const regName = document.getElementById('reg-name')?.value?.trim() || '';
             const regEmail = document.getElementById('reg-email')?.value?.trim() || '';
             const regPassword = document.getElementById('reg-password')?.value || '';
-            const regPlan = document.getElementById('reg-plan')?.value || 'pro';
             const regProvince = document.getElementById('reg-province')?.value?.trim() || '';
 
             try {
                 if (!supabaseClient) throw new Error("Supabase no está conectado.");
-                
+
                 // 1. Usar Supabase Auth Integrado
-                const { data, error } = await supabaseClient.auth.signUp({ 
-                    email: regEmail, 
-                    password: regPassword 
+                const { error } = await supabaseClient.auth.signUp({
+                    email: regEmail,
+                    password: regPassword
                 });
-                
+
                 if (error) throw error;
 
                 // 2. Anotar en historial de accesos
                 await recordAccess(supabaseClient, regEmail, 'registro-oficial', 'user');
-                
-                // 3. Continuar guardando en users.json administrativo
-                await registerUser(supabaseClient, regName, regEmail, regPlan, regProvince);
-                
-                BSAlert('✅ Registro guardado. Revisa tu correo electrónico para verificar la cuenta antes de entrar.');
+
+                // 3. Guardar en users.json con plan 'free' por defecto
+                // El usuario podra elegir un plan PRO/ELITE despues desde su perfil
+                await registerUser(supabaseClient, regName, regEmail, 'free', regProvince);
+
+                BSAlert('✅ Cuenta gratuita creada. Revisa tu correo para verificar la cuenta antes de entrar. Despues podras elegir un plan PRO o ELITE desde tu perfil.');
                 registerForm.reset();
 
             } catch (err) {
@@ -1104,9 +1123,13 @@ export function initializeAppLogic() {
     // Botones de Compra y Suscripción (Botones grandes que hacen acciones de pago)
     document.querySelectorAll('.pricing-col .btn, .event-details .btn, .dashboard-actions .btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
+            // Estos botones tienen su propio handler especifico mas abajo
+            if (btn.classList.contains('plan-select-btn')) return;
+            if (btn.id === 'dashboard-choose-plan-btn') return;
+
             e.preventDefault();
             const originalText = btn.innerHTML;
-            
+
             // Si es un botón de cancelar, mostramos confirmación
             if (btn.textContent.includes('Cancelar')) {
                 BSConfirm('¿Estás seguro de que deseas cancelar tu suscripción?').then(ok => {
@@ -1121,21 +1144,85 @@ export function initializeAppLogic() {
             // Animación de carga para el resto
             btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Procesando...';
             btn.style.pointerEvents = 'none';
-            
+
             setTimeout(() => {
                 btn.innerHTML = originalText;
                 btn.style.pointerEvents = 'auto';
-                
+
                 if (btn.textContent.includes('Entradas')) {
                     BSAlert('🎟️ Ticket reservado temporalmente. Te redirigiremos al pago. (Simulación)');
-                } else if (btn.textContent.includes('Pro') || btn.textContent.includes('Elite')) {
-                    BSAlert('💳 Redirigiendo a la pasarela segura de pago para procesar la suscripción.');
                 } else if (btn.textContent.includes('Cambiar')) {
                     document.querySelector('[data-target="pricing-view"]').click();
                 }
             }, 1000);
         });
     });
+
+    // Handler especifico de "Seleccionar Pro/Elite"
+    // - Si el usuario NO esta logueado: guarda el plan elegido y le manda al registro
+    // - Si esta logueado: actualiza su plan en users.json y muestra confirmacion
+    document.querySelectorAll('.plan-select-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const plan = btn.getAttribute('data-plan') || 'pro';
+            const planLabel = plan.toUpperCase();
+            const session = UserSession.get();
+
+            if (!session) {
+                // Usuario no logueado: guarda el plan elegido y va al registro
+                sessionStorage.setItem('bs_pending_plan', plan);
+                BSAlert(`✨ Para suscribirte al plan ${planLabel} primero crea tu cuenta gratuita. Te llevamos al registro.`);
+                setTimeout(() => {
+                    navigateTo('auth-view');
+                    // Cambiar a la pestaña de registro
+                    const registerTab = document.querySelector('.auth-tab[data-auth="register"]');
+                    if (registerTab) registerTab.click();
+                }, 800);
+                return;
+            }
+
+            // Usuario logueado: actualizar plan
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Procesando...';
+            btn.style.pointerEvents = 'none';
+            try {
+                const sbSession = await supabaseClient?.auth.getSession();
+                const email = sbSession?.data?.session?.user?.email;
+                if (email) {
+                    const users = await loadUsers(supabaseClient);
+                    const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+                    if (idx !== -1) {
+                        users[idx].plan = plan;
+                        await saveUsers(supabaseClient, users);
+                    }
+                }
+                BSAlert(`✅ Has elegido el plan ${planLabel}. En breve te contactaremos para completar el pago.`);
+                // Actualizar el dashboard si esta visible
+                const planNameEl = document.getElementById('user-plan-name');
+                if (planNameEl) planNameEl.textContent = planLabel;
+                const planBadge = document.getElementById('user-plan-badge');
+                if (planBadge) {
+                    planBadge.textContent = 'Pendiente de pago';
+                    planBadge.classList.add('active');
+                }
+            } catch (err) {
+                console.error('Error actualizando plan:', err);
+                BSAlert('❌ No se pudo guardar tu eleccion. Intentalo de nuevo.');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.style.pointerEvents = 'auto';
+            }
+        });
+    });
+
+    // Boton "Elegir Plan" del dashboard del usuario -> lleva a la pagina de planes
+    const dashboardChoosePlanBtn = document.getElementById('dashboard-choose-plan-btn');
+    if (dashboardChoosePlanBtn) {
+        dashboardChoosePlanBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateTo('pricing-view');
+        });
+    }
 
     // Botones de descarga (Presskit y pistas WAV/FLAC)
     // Delegación para botones de descarga (fetch blob — evita nueva pestaña)
