@@ -240,7 +240,7 @@ export default function App() {
                         <form id="login-form" className="auth-form active">
                             
                             <div className="social-logins">
-                                <button type="button" className="btn btn-social"><i className="ph-fill ph-spotify-logo" style={{ "color": "#1ED760" }}></i> Continuar con Spotify</button>
+                                <button type="button" id="spotify-login-btn" className="btn btn-social"><i className="ph-fill ph-spotify-logo" style={{ "color": "#1ED760" }}></i> Continuar con Spotify</button>
                                 <div id="google-login-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}></div>
                             </div>
                             

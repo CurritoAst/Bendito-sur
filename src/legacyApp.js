@@ -833,6 +833,32 @@ export function initializeAppLogic() {
         }
     }
 
+    // Lógica de Submit LOGIN (Spotify)
+    const spotifyLoginBtn = document.getElementById('spotify-login-btn');
+    if (spotifyLoginBtn && supabaseClient) {
+        spotifyLoginBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const originalText = spotifyLoginBtn.innerHTML;
+            spotifyLoginBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Conectando...';
+            spotifyLoginBtn.style.pointerEvents = 'none';
+
+            try {
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: 'spotify',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+                if (error) throw error;
+            } catch (err) {
+                console.error(err);
+                BSAlert('❌ Error iniciando sesión con Spotify.');
+                spotifyLoginBtn.innerHTML = originalText;
+                spotifyLoginBtn.style.pointerEvents = 'auto';
+            }
+        });
+    }
+
     // Lógica de Submit LOGIN
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
