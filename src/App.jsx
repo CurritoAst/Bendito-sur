@@ -5,6 +5,13 @@ import { initializeAppLogic } from './legacyApp.js';
 
 export default function App() {
     useEffect(() => {
+        // Si llegamos desde el link de verificacion de email o de OAuth callback,
+        // marcar el flag de "fresh sign-in" para que el listener muestre bienvenida
+        // y redirija al dashboard tras la confirmacion.
+        if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('type=signup'))) {
+            sessionStorage.setItem('bs_just_signed_in', '1');
+        }
+
         // Pantalla de bloqueo
         const lockOverlay = document.getElementById('site-lock-overlay');
         const LOCK_PASSWORD = 'CurritoPan24demarzo';

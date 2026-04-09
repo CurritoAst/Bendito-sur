@@ -804,10 +804,14 @@ export function initializeAppLogic() {
                             console.log('[Auth] Usuario existente encontrado');
                             UserSession.set('user');
                             isAllowed = true;
-                        } else if (provider === 'google' || provider === 'spotify') {
-                            // Auto-registro: usuario que llega por OAuth y no existe todavía
+                        } else {
+                            // Cualquier usuario con sesion Supabase valida (Google, Spotify, email, ...)
+                            // que no este todavia en users.json se auto-registra.
+                            // Si llego aqui es porque ya paso por signUp() o por el link de verificacion,
+                            // asi que es legitimo. Esto tambien cubre el caso en el que saveUsers fallo
+                            // durante el registro inicial (bug del 400 de Storage).
                             const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Usuario');
-                            console.log('[Auth] Auto-registrando usuario OAuth:', displayName);
+                            console.log('[Auth] Auto-registrando usuario nuevo (' + provider + '):', displayName);
                             UserSession.set('user');
                             isAllowed = true;
                             isNewUser = true;
@@ -821,8 +825,6 @@ export function initializeAppLogic() {
                             ]).then(results => {
                                 console.log('[Auth] Auto-registro background completado', results);
                             });
-                        } else {
-                            console.warn('[Auth] Usuario no encontrado y provider no es OAuth:', provider);
                         }
                     } catch(e) { console.error('Error cargando usuarios permitidos:', e); }
                 }
