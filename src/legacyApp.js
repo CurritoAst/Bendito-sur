@@ -768,16 +768,26 @@ export function initializeAppLogic() {
         });
     });
 
+    // Helper: detecta si el SIGNED_IN viene de una accion explicita del usuario
+    // (no de una sesion restaurada en page reload). Consume el flag.
+    const consumeJustSignedInFlag = () => {
+        const v = sessionStorage.getItem('bs_just_signed_in') === '1';
+        if (v) sessionStorage.removeItem('bs_just_signed_in');
+        return v;
+    };
+
     // Auth State Listener para Login de Google, Spotify y Sesiones
     if (supabaseClient) {
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             console.log('[Auth] Event:', event, 'Session:', !!session);
             if (event === 'SIGNED_IN' && session) {
+                const isFreshSignIn = consumeJustSignedInFlag();
                 const email = session.user?.email || '';
                 const provider = session.user?.app_metadata?.provider || '';
                 const meta = session.user?.user_metadata || {};
-                console.log('[Auth] SIGNED_IN:', { email, provider });
+                console.log('[Auth] SIGNED_IN:', { email, provider, isFreshSignIn });
                 let isAllowed = false;
+                let isNewUser = false;
 
                 if (email === 'admin@benditosur.es') {
                     UserSession.set('admin');
@@ -800,7 +810,7 @@ export function initializeAppLogic() {
                             console.log('[Auth] Auto-registrando usuario OAuth:', displayName);
                             UserSession.set('user');
                             isAllowed = true;
-                            BSAlert(`✅ ¡Bienvenido/a a Bendito Sur, ${displayName}!`);
+                            isNewUser = true;
                             // Fire-and-forget: el registro en users.json se hace en background
                             // para no bloquear el redirect al dashboard
                             // Plan 'free' por defecto: el usuario empezara con la cuenta a 0
@@ -825,17 +835,28 @@ export function initializeAppLogic() {
                     return;
                 }
 
-                // Redirección incondicional al dashboard correspondiente
-                const targetViewId = UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view';
-                console.log('[Auth] Redirigiendo a:', targetViewId);
-                try {
-                    navigateTo(targetViewId);
-                } catch (e) {
-                    console.error('[Auth] Error en navigateTo, fallback manual:', e);
-                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                    const dbView = document.getElementById(targetViewId);
-                    if (dbView) dbView.classList.add('active');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                // Solo mostrar bienvenida y redirigir si es un sign-in real
+                // (no en refresh con sesion ya existente)
+                if (isFreshSignIn) {
+                    const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Usuario');
+                    if (isNewUser) {
+                        BSAlert(`✅ ¡Bienvenido/a a Bendito Sur, ${displayName}!`);
+                    } else {
+                        BSAlert(`👋 ¡Hola de nuevo, ${displayName}!`);
+                    }
+                    const targetViewId = UserSession.get() === 'admin' ? 'admin-view' : 'dashboard-view';
+                    console.log('[Auth] Redirigiendo a:', targetViewId);
+                    try {
+                        navigateTo(targetViewId);
+                    } catch (e) {
+                        console.error('[Auth] Error en navigateTo, fallback manual:', e);
+                        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                        const dbView = document.getElementById(targetViewId);
+                        if (dbView) dbView.classList.add('active');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                } else {
+                    console.log('[Auth] Sesion restaurada (refresh) - sin alerta ni redirect');
                 }
             } else if (event === 'SIGNED_OUT') {
                 UserSession.clear();
@@ -869,12 +890,16 @@ export function initializeAppLogic() {
             callback: async (response) => {
                 console.log('[GSI] Credential recibido, llamando a Supabase signInWithIdToken');
                 try {
+                    sessionStorage.setItem('bs_just_signed_in', '1');
                     const { data, error } = await supabaseClient.auth.signInWithIdToken({
                         provider: 'google',
                         token: response.credential,
                         nonce: rawNonce,
                     });
-                    if (error) throw error;
+                    if (error) {
+                        sessionStorage.removeItem('bs_just_signed_in');
+                        throw error;
+                    }
                     console.log('[GSI] signInWithIdToken OK, esperando SIGNED_IN event', !!data?.session);
                 } catch (err) {
                     console.error('[GSI] Error Google ID Token:', err);
@@ -910,13 +935,17 @@ export function initializeAppLogic() {
             spotifyLoginBtn.style.pointerEvents = 'none';
 
             try {
+                sessionStorage.setItem('bs_just_signed_in', '1');
                 const { error } = await supabaseClient.auth.signInWithOAuth({
                     provider: 'spotify',
                     options: {
                         redirectTo: window.location.origin
                     }
                 });
-                if (error) throw error;
+                if (error) {
+                    sessionStorage.removeItem('bs_just_signed_in');
+                    throw error;
+                }
             } catch (err) {
                 console.error(err);
                 BSAlert('❌ Error iniciando sesión con Spotify.');
@@ -973,8 +1002,10 @@ export function initializeAppLogic() {
             // Flujo Supabase Standard
             try {
                 if (!supabaseClient) throw new Error("Supabase no está conectado.");
+                sessionStorage.setItem('bs_just_signed_in', '1');
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
                 if (error) {
+                    sessionStorage.removeItem('bs_just_signed_in');
                     if (error.message.includes('Email not confirmed')) {
                         throw new Error('Debes confirmar tu correo electrónico haciendo clic en el enlace que te enviamos.');
                     } else if (error.message.includes('Invalid login credentials')) {
