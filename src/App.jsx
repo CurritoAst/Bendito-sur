@@ -241,7 +241,7 @@ export default function App() {
                             
                             <div className="social-logins">
                                 <button type="button" className="btn btn-social"><i className="ph-fill ph-spotify-logo" style={{ "color": "#1ED760" }}></i> Continuar con Spotify</button>
-                                <button type="button" id="google-login-btn" className="btn btn-social"><i className="ph-fill ph-google-logo"></i> Continuar con Google</button>
+                                <div id="google-login-container" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}></div>
                             </div>
                             
                             <div className="auth-divider"><span>O con tu email</span></div>

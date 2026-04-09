@@ -793,30 +793,44 @@ export function initializeAppLogic() {
         });
     }
 
-    // Lógica de Submit LOGIN (Google)
-    const googleLoginBtn = document.getElementById('google-login-btn');
-    if (googleLoginBtn && supabaseClient) {
-        googleLoginBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const originalText = googleLoginBtn.innerHTML;
-            googleLoginBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Conectando...';
-            googleLoginBtn.style.pointerEvents = 'none';
-
-            try {
-                const { error } = await supabaseClient.auth.signInWithOAuth({
-                    provider: 'google',
-                    options: {
-                        redirectTo: window.location.origin
-                    }
-                });
-                if (error) throw error;
-            } catch (err) {
-                console.error(err);
-                BSAlert('❌ Error iniciando sesión con Google.');
-                googleLoginBtn.innerHTML = originalText;
-                googleLoginBtn.style.pointerEvents = 'auto';
+    // Renderización de Google Identity Services nativo (By-pass Supabase Redirect)
+    const renderGoogleBtn = () => {
+        const container = document.getElementById('google-login-container');
+        if (!container || !supabaseClient || !window.google) return;
+        
+        window.google.accounts.id.initialize({
+            client_id: '163528816692-v5phke0fgue2oljn4m5q8v2mqk3m6ec7.apps.googleusercontent.com',
+            callback: async (response) => {
+                try {
+                    const { error } = await supabaseClient.auth.signInWithIdToken({
+                        provider: 'google',
+                        token: response.credential,
+                    });
+                    if (error) throw error;
+                    // El onAuthStateChange listener se encargará de la redirección
+                } catch (err) {
+                    console.error('Error Google ID Token:', err);
+                    BSAlert('❌ Error iniciando sesión con Google (Token inválido).');
+                }
             }
         });
+        window.google.accounts.id.renderButton(
+            container,
+            { theme: 'filled_black', size: 'large', type: 'standard', shape: 'rectangular', text: 'continue_with' }
+        );
+    };
+
+    if (document.getElementById('google-login-container')) {
+        if (!window.google) {
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.onload = renderGoogleBtn;
+            document.head.appendChild(script);
+        } else {
+            renderGoogleBtn();
+        }
     }
 
     // Lógica de Submit LOGIN
