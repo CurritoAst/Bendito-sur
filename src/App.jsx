@@ -46,10 +46,30 @@ export default function App() {
         // Ejecutar lógica antigua sobre el DOM una vez montado
         try { initializeAppLogic(); } catch(e) { console.error('App init error:', e); }
 
-        // Auto-refresco cada 5 minutos
-        const refreshInterval = setInterval(() => {
-            window.location.reload();
-        }, 5 * 60 * 1000);
+        // Auto-refresco suave cada 10 minutos
+        // - No recarga si el usuario esta interactuando (input, audio, modal)
+        // - Hace fade-out antes de recargar para una transicion suave
+        const isUserBusy = () => {
+            const active = document.activeElement;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return true;
+            const playingAudio = Array.from(document.querySelectorAll('audio')).some(a => !a.paused && !a.ended);
+            if (playingAudio) return true;
+            const openModal = document.querySelector('.modal.active, .bs-alert.show, [data-modal-open="true"]');
+            if (openModal) return true;
+            return false;
+        };
+
+        const softReload = () => {
+            if (isUserBusy()) {
+                console.log('[AutoRefresh] Usuario activo, saltando ciclo');
+                return;
+            }
+            document.body.style.transition = 'opacity 0.5s ease';
+            document.body.style.opacity = '0';
+            setTimeout(() => window.location.reload(), 500);
+        };
+
+        const refreshInterval = setInterval(softReload, 10 * 60 * 1000);
 
         return () => clearInterval(refreshInterval);
     }, []);
