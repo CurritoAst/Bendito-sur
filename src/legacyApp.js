@@ -768,17 +768,36 @@ export function initializeAppLogic() {
         });
     });
 
-    // Auth State Listener para Login de Google y Sesiones
+    // Auth State Listener para Login de Google, Spotify y Sesiones
     if (supabaseClient) {
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session) {
                 const email = session.user?.email || '';
+                let isAllowed = false;
+
                 if (email === 'admin@benditosur.es') {
                     UserSession.set('admin');
+                    isAllowed = true;
                 } else if (email === 'collab@benditosur.es') {
                     UserSession.set('collab');
+                    isAllowed = true;
                 } else {
-                    UserSession.set('user');
+                    // Verificar si el usuario existe en nuestra base de datos (users.json)
+                    try {
+                        const usersList = await loadUsers(supabaseClient);
+                        const userFound = usersList.find(u => u.email.toLowerCase() === email.toLowerCase());
+                        if (userFound) {
+                            UserSession.set('user');
+                            isAllowed = true;
+                        }
+                    } catch(e) { console.error('Error cargando usuarios permitidos:', e); }
+                }
+
+                if (!isAllowed) {
+                    await supabaseClient.auth.signOut();
+                    UserSession.clear();
+                    BSAlert(`❌ Acceso denegado: el correo ${email} no está registrado en Bendito Sur. Contacta con nosotros para obtener acceso.`);
+                    return;
                 }
                 
                 const authView = document.getElementById('auth-view');
