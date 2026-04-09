@@ -819,7 +819,7 @@ export function initializeAppLogic() {
         if (!container || !supabaseClient || !window.google) return;
         
         window.google.accounts.id.initialize({
-            client_id: '163528816692-v5phke0fgue2oljn4m5q8v2mqk3m6ec7.apps.googleusercontent.com',
+            client_id: '84844867888-upkc3dn6pafhu7sb3f91c7s417ugf3ql.apps.googleusercontent.com',
             callback: async (response) => {
                 try {
                     const { error } = await supabaseClient.auth.signInWithIdToken({
