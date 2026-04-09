@@ -1169,15 +1169,13 @@ export function initializeAppLogic() {
             const session = UserSession.get();
 
             if (!session) {
-                // Usuario no logueado: guarda el plan elegido y va al registro
+                // Usuario no logueado: guarda el plan elegido y va al registro inmediatamente
                 sessionStorage.setItem('bs_pending_plan', plan);
-                BSAlert(`✨ Para suscribirte al plan ${planLabel} primero crea tu cuenta gratuita. Te llevamos al registro.`);
-                setTimeout(() => {
-                    navigateTo('auth-view');
-                    // Cambiar a la pestaña de registro
-                    const registerTab = document.querySelector('.auth-tab[data-auth="register"]');
-                    if (registerTab) registerTab.click();
-                }, 800);
+                navigateTo('auth-view');
+                // Cambiar a la pestaña de registro
+                const registerTab = document.querySelector('.auth-tab[data-auth="register"]');
+                if (registerTab) registerTab.click();
+                BSAlert(`✨ Para suscribirte al plan ${planLabel} primero crea tu cuenta gratuita. Despues aplicaremos el plan automaticamente.`);
                 return;
             }
 
