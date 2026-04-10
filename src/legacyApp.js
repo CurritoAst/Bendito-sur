@@ -4,6 +4,7 @@
 
 
 import { CONFIG } from './config.js';
+import { buildStripeCheckoutUrl, STRIPE_PLAN_PRICES } from './stripeConfig.js';
 
 // === MODAL SYSTEM ===
 
@@ -776,6 +777,75 @@ export function initializeAppLogic() {
         return v;
     };
 
+    // Handler de vuelta desde Stripe: si la URL tiene ?payment=success&plan=X&cycle=Y
+    // actualizamos el plan del usuario en users.json y mostramos confirmacion.
+    // El listener de Supabase se encargara de restaurar la sesion automaticamente
+    // (Supabase guarda el token en localStorage), asi que el usuario vera su perfil
+    // inmediatamente con el nuevo plan activo.
+    const handleStripeReturn = async () => {
+        const url = new URL(window.location.href);
+        const paymentStatus = url.searchParams.get('payment');
+        if (!paymentStatus) return;
+        const plan = (url.searchParams.get('plan') || sessionStorage.getItem('bs_checkout_plan') || '').toLowerCase();
+        const cycle = (url.searchParams.get('cycle') || sessionStorage.getItem('bs_checkout_cycle') || '').toLowerCase();
+        // Limpiar la URL inmediatamente para que un refresh no vuelva a disparar esto
+        url.searchParams.delete('payment');
+        url.searchParams.delete('plan');
+        url.searchParams.delete('cycle');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : '') + url.hash);
+        sessionStorage.removeItem('bs_checkout_plan');
+        sessionStorage.removeItem('bs_checkout_cycle');
+
+        if (paymentStatus === 'cancel' || paymentStatus === 'cancelled') {
+            BSAlert('❎ Has cancelado el pago. Puedes volver a intentarlo cuando quieras.');
+            return;
+        }
+        if (paymentStatus !== 'success') return;
+
+        // Esperar a que Supabase restaure la sesion (hasta ~3s)
+        let sbSession = null;
+        for (let i = 0; i < 15; i++) {
+            const r = await supabaseClient?.auth.getSession();
+            if (r?.data?.session) { sbSession = r.data.session; break; }
+            await new Promise(res => setTimeout(res, 200));
+        }
+        if (!sbSession) {
+            BSAlert('✅ Pago completado. Inicia sesion para ver tu plan activo.');
+            return;
+        }
+        const email = sbSession.user?.email || '';
+        if (!email || !plan) {
+            BSAlert('✅ Pago completado. Si tu plan no aparece actualizado en unos minutos, contacta con nosotros.');
+            return;
+        }
+        try {
+            const users = await loadUsers(supabaseClient);
+            const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+            if (idx !== -1) {
+                users[idx].plan = plan;
+                if (cycle) users[idx].billingCycle = cycle;
+                users[idx].planActivatedAt = new Date().toISOString();
+                await saveUsers(supabaseClient, users);
+            }
+        } catch (e) {
+            console.warn('Error actualizando plan tras pago:', e);
+        }
+        const planLabel = plan.toUpperCase();
+        const cycleLabel = cycle ? ` (${cycle})` : '';
+        BSAlert(`🎉 ¡Pago confirmado! Tu plan ${planLabel}${cycleLabel} esta activo. Bienvenido/a a la familia Bendito Sur.`);
+        // Refrescar UI del dashboard si los elementos existen
+        const planNameEl = document.getElementById('user-plan-name');
+        if (planNameEl) planNameEl.textContent = planLabel;
+        const planBadge = document.getElementById('user-plan-badge');
+        if (planBadge) {
+            planBadge.textContent = 'Activo';
+            planBadge.classList.add('active');
+        }
+        try { navigateTo('dashboard-view'); } catch (e) { /* noop */ }
+    };
+    // Ejecutar en segundo plano (no bloquea el resto de la inicializacion)
+    handleStripeReturn().catch(err => console.error('Error en handleStripeReturn:', err));
+
     // Auth State Listener para Login de Google, Spotify y Sesiones
     if (supabaseClient) {
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
@@ -848,20 +918,17 @@ export function initializeAppLogic() {
                     }
 
                     // Si el usuario habia elegido un plan antes de registrarse,
-                    // se le aplica automaticamente y se le lleva a la pagina de planes
+                    // tras el login le abrimos directamente el modal de seleccion de ciclo
+                    // para que pueda pagar en Stripe. No tocamos su plan hasta que Stripe
+                    // confirme el pago (via redireccion de exito).
                     const pendingPlan = sessionStorage.getItem('bs_pending_plan');
                     if (pendingPlan && UserSession.get() === 'user') {
                         sessionStorage.removeItem('bs_pending_plan');
-                        try {
-                            const users = await loadUsers(supabaseClient);
-                            const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-                            if (idx !== -1) {
-                                users[idx].plan = pendingPlan;
-                                await saveUsers(supabaseClient, users);
-                            }
-                        } catch (e) { console.warn('Error aplicando plan pendiente:', e); }
-                        BSAlert(`💳 Tu plan ${pendingPlan.toUpperCase()} esta listo. En breve te contactaremos para completar el pago.`);
                         try { navigateTo('pricing-view'); } catch (e) { console.error(e); }
+                        // Pequeño delay para que el modal aparezca sobre la vista de pricing
+                        setTimeout(() => {
+                            try { openBillingCycleModal(pendingPlan, email); } catch (e) { console.error('Error abriendo modal pendiente:', e); }
+                        }, 400);
                         return;
                     }
 
@@ -1160,9 +1227,108 @@ export function initializeAppLogic() {
         });
     });
 
-    // Handler especifico de "Seleccionar Pro/Elite"
-    // - Si el usuario NO esta logueado: guarda el plan elegido y le manda al registro
-    // - Si esta logueado: actualiza su plan en users.json y muestra confirmacion
+    // Modal de seleccion de ciclo de facturacion + redireccion a Stripe
+    // El flujo real de pago ocurre en Stripe Checkout (Payment Links).
+    // Cuando el pago se completa, Stripe redirige de vuelta a la web con
+    // ?payment=success&plan=X&cycle=Y y el listener del App.jsx activa el plan.
+    const openBillingCycleModal = (plan, email) => {
+        const planLabel = plan.toUpperCase();
+        const prices = STRIPE_PLAN_PRICES[plan];
+        if (!prices) return;
+
+        // Crear overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'bs-stripe-modal';
+        overlay.setAttribute('data-modal-open', 'true');
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 100000;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 1rem; animation: bsFadeIn 0.25s ease;
+        `;
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: linear-gradient(180deg, #141414 0%, #0a0a0a 100%);
+            border: 1px solid rgba(247,168,0,0.25); border-radius: 8px;
+            max-width: 480px; width: 100%; padding: 2rem;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.8);
+            max-height: 90vh; overflow-y: auto;
+        `;
+
+        const cycles = ['mensual', 'trimestral', 'semestral', 'anual'];
+        const cyclesHtml = cycles.map(cycle => {
+            const p = prices[cycle];
+            const discountBadge = p.discount
+                ? `<span style="background: rgba(247,168,0,0.15); color: var(--gold, #f3c948); font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 3px; margin-left: 0.5rem;">${p.discount}</span>`
+                : '';
+            return `
+                <button class="bs-cycle-btn" data-cycle="${cycle}" style="
+                    display: flex; justify-content: space-between; align-items: center;
+                    width: 100%; padding: 1rem; margin-bottom: 0.6rem;
+                    background: rgba(255,255,255,0.04);
+                    border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;
+                    color: #fff; cursor: pointer; text-align: left;
+                    transition: all 0.2s ease; font-family: inherit;
+                ">
+                    <div>
+                        <div style="font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">${p.label}${discountBadge}</div>
+                        <div style="font-size: 0.75rem; color: #a0a0a0; margin-top: 0.2rem;">${p.perMonth} / mes</div>
+                    </div>
+                    <div style="font-size: 1.05rem; font-weight: 700; color: var(--gold, #f3c948);">${p.price}</div>
+                </button>
+            `;
+        }).join('');
+
+        card.innerHTML = `
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <div style="font-size: 0.7rem; letter-spacing: 3px; color: var(--gold, #f3c948); text-transform: uppercase; margin-bottom: 0.3rem;">Plan ${planLabel}</div>
+                <h3 style="font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 2px; color: #fff; margin: 0;">Elige tu ciclo</h3>
+                <p style="font-size: 0.85rem; color: #888; margin-top: 0.5rem;">Pago seguro con Stripe. Cancela cuando quieras.</p>
+            </div>
+            ${cyclesHtml}
+            <button class="bs-cycle-cancel" style="
+                width: 100%; margin-top: 0.8rem; padding: 0.8rem;
+                background: transparent; border: 1px solid rgba(255,255,255,0.1);
+                color: #888; border-radius: 4px; cursor: pointer;
+                font-family: inherit; font-size: 0.85rem; letter-spacing: 1px;
+            ">Cancelar</button>
+        `;
+
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        // Hover effect para los botones de ciclo
+        card.querySelectorAll('.bs-cycle-btn').forEach((b) => {
+            b.addEventListener('mouseenter', () => {
+                b.style.borderColor = 'rgba(247,168,0,0.5)';
+                b.style.background = 'rgba(247,168,0,0.05)';
+            });
+            b.addEventListener('mouseleave', () => {
+                b.style.borderColor = 'rgba(255,255,255,0.08)';
+                b.style.background = 'rgba(255,255,255,0.04)';
+            });
+            b.addEventListener('click', () => {
+                const cycle = b.getAttribute('data-cycle');
+                const url = buildStripeCheckoutUrl(plan, cycle, email);
+                if (!url) {
+                    BSAlert('❌ No se ha podido generar el enlace de pago. Intentalo mas tarde.');
+                    return;
+                }
+                // Guardar seleccion para mostrar confirmacion al volver
+                sessionStorage.setItem('bs_checkout_plan', plan);
+                sessionStorage.setItem('bs_checkout_cycle', cycle);
+                // Redirigir a Stripe
+                window.location.href = url;
+            });
+        });
+
+        const close = () => { try { overlay.remove(); } catch (e) { /* noop */ } };
+        card.querySelector('.bs-cycle-cancel').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    };
+
+    // Handler del boton "Seleccionar Pro/Elite"
     document.querySelectorAll('.plan-select-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.preventDefault();
@@ -1174,43 +1340,20 @@ export function initializeAppLogic() {
                 // Usuario no logueado: guarda el plan elegido y va al registro inmediatamente
                 sessionStorage.setItem('bs_pending_plan', plan);
                 navigateTo('auth-view');
-                // Cambiar a la pestaña de registro
                 const registerTab = document.querySelector('.auth-tab[data-auth="register"]');
                 if (registerTab) registerTab.click();
-                BSAlert(`✨ Para suscribirte al plan ${planLabel} primero crea tu cuenta gratuita. Despues aplicaremos el plan automaticamente.`);
+                BSAlert(`✨ Para suscribirte al plan ${planLabel} primero crea tu cuenta gratuita. Despues te llevaremos al pago.`);
                 return;
             }
 
-            // Usuario logueado: actualizar plan
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Procesando...';
-            btn.style.pointerEvents = 'none';
+            // Usuario logueado: obtener email y abrir modal de ciclo
             try {
                 const sbSession = await supabaseClient?.auth.getSession();
-                const email = sbSession?.data?.session?.user?.email;
-                if (email) {
-                    const users = await loadUsers(supabaseClient);
-                    const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-                    if (idx !== -1) {
-                        users[idx].plan = plan;
-                        await saveUsers(supabaseClient, users);
-                    }
-                }
-                BSAlert(`✅ Has elegido el plan ${planLabel}. En breve te contactaremos para completar el pago.`);
-                // Actualizar el dashboard si esta visible
-                const planNameEl = document.getElementById('user-plan-name');
-                if (planNameEl) planNameEl.textContent = planLabel;
-                const planBadge = document.getElementById('user-plan-badge');
-                if (planBadge) {
-                    planBadge.textContent = 'Pendiente de pago';
-                    planBadge.classList.add('active');
-                }
+                const email = sbSession?.data?.session?.user?.email || '';
+                openBillingCycleModal(plan, email);
             } catch (err) {
-                console.error('Error actualizando plan:', err);
-                BSAlert('❌ No se pudo guardar tu eleccion. Intentalo de nuevo.');
-            } finally {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
+                console.error('Error abriendo checkout:', err);
+                BSAlert('❌ No se pudo iniciar el proceso de pago. Intentalo de nuevo.');
             }
         });
     });

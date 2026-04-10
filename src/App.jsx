@@ -12,6 +12,12 @@ export default function App() {
             sessionStorage.setItem('bs_just_signed_in', '1');
         }
 
+        // Al volver de Stripe (?payment=success) silenciamos la alerta de bienvenida
+        // para que no se solape con la alerta de "pago confirmado".
+        if (window.location.search && window.location.search.includes('payment=')) {
+            sessionStorage.removeItem('bs_just_signed_in');
+        }
+
         // Pantalla de bloqueo
         const lockOverlay = document.getElementById('site-lock-overlay');
         const LOCK_PASSWORD = 'CurritoPan24demarzo';
