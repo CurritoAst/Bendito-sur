@@ -925,7 +925,7 @@ export default function App() {
                         <h3 className="dashboard-card-title"><i className="ph ph-star"></i> Mi Suscripcion</h3>
                         <div className="sub-status">
                             <span className="status-badge" id="user-plan-badge">Sin plan</span>
-                            <div className="sub-plan" id="user-plan-name">FREE</div>
+                            <div className="sub-plan" id="user-plan-name">—</div>
                             <p className="sub-renewal" id="user-plan-renewal">Sin suscripcion activa</p>
                         </div>
                         <div className="dashboard-actions">

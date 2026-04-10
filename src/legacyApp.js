@@ -777,6 +777,49 @@ export function initializeAppLogic() {
         return v;
     };
 
+    // Refresca la tarjeta "Mi Suscripcion" del dashboard en funcion del plan del
+    // usuario en users.json. Si el usuario no tiene plan activo (free / vacio)
+    // muestra "Sin suscripcion activa". Si tiene PRO o ELITE muestra el plan
+    // activo y la fecha de activacion.
+    const refreshUserSubscriptionUI = async (email) => {
+        const planNameEl = document.getElementById('user-plan-name');
+        const planBadge = document.getElementById('user-plan-badge');
+        const planRenewal = document.getElementById('user-plan-renewal');
+        if (!planNameEl || !planBadge || !planRenewal) return;
+        let plan = '';
+        let activatedAt = '';
+        try {
+            if (email && supabaseClient) {
+                const users = await loadUsers(supabaseClient);
+                const u = users.find(x => x.email && x.email.toLowerCase() === email.toLowerCase());
+                if (u) {
+                    plan = (u.plan || '').toLowerCase();
+                    activatedAt = u.planActivatedAt || '';
+                }
+            }
+        } catch (e) { console.warn('refreshUserSubscriptionUI error:', e); }
+
+        const hasActivePlan = plan === 'pro' || plan === 'elite';
+        if (hasActivePlan) {
+            planNameEl.textContent = plan.toUpperCase();
+            planBadge.textContent = 'Activo';
+            planBadge.classList.add('active');
+            if (activatedAt) {
+                try {
+                    const d = new Date(activatedAt);
+                    planRenewal.textContent = `Activo desde ${d.toLocaleDateString('es-ES')}`;
+                } catch { planRenewal.textContent = 'Suscripcion activa'; }
+            } else {
+                planRenewal.textContent = 'Suscripcion activa';
+            }
+        } else {
+            planNameEl.textContent = '—';
+            planBadge.textContent = 'Sin plan';
+            planBadge.classList.remove('active');
+            planRenewal.textContent = 'Sin suscripcion activa';
+        }
+    };
+
     // Handler de vuelta desde Stripe: si la URL tiene ?payment=success&plan=X&cycle=Y
     // actualizamos el plan del usuario en users.json y mostramos confirmacion.
     // El listener de Supabase se encargara de restaurar la sesion automaticamente
@@ -833,14 +876,7 @@ export function initializeAppLogic() {
         const planLabel = plan.toUpperCase();
         const cycleLabel = cycle ? ` (${cycle})` : '';
         BSAlert(`🎉 ¡Pago confirmado! Tu plan ${planLabel}${cycleLabel} esta activo. Bienvenido/a a la familia Bendito Sur.`);
-        // Refrescar UI del dashboard si los elementos existen
-        const planNameEl = document.getElementById('user-plan-name');
-        if (planNameEl) planNameEl.textContent = planLabel;
-        const planBadge = document.getElementById('user-plan-badge');
-        if (planBadge) {
-            planBadge.textContent = 'Activo';
-            planBadge.classList.add('active');
-        }
+        await refreshUserSubscriptionUI(email);
         try { navigateTo('dashboard-view'); } catch (e) { /* noop */ }
     };
     // Ejecutar en segundo plano (no bloquea el resto de la inicializacion)
@@ -905,6 +941,12 @@ export function initializeAppLogic() {
                     UserSession.clear();
                     BSAlert(`❌ Acceso denegado: el correo ${email} no está registrado en Bendito Sur. Contacta con nosotros para obtener acceso.`);
                     return;
+                }
+
+                // Rellenar la tarjeta "Mi Suscripcion" con el plan real del usuario
+                // (tanto en sign-in real como en restauracion de sesion tras refresh)
+                if (UserSession.get() === 'user') {
+                    refreshUserSubscriptionUI(email).catch(e => console.warn('refresh sub UI:', e));
                 }
 
                 // Solo mostrar bienvenida y redirigir si es un sign-in real
