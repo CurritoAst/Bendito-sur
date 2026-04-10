@@ -922,23 +922,27 @@ export function initializeAppLogic() {
                             // Cualquier usuario con sesion Supabase valida (Google, Spotify, email, ...)
                             // que no este todavia en users.json se auto-registra.
                             // Si llego aqui es porque ya paso por signUp() o por el link de verificacion,
-                            // asi que es legitimo. Esto tambien cubre el caso en el que saveUsers fallo
-                            // durante el registro inicial (bug del 400 de Storage).
+                            // asi que es legitimo.
                             const displayName = meta.full_name || meta.name || meta.user_name || (email ? email.split('@')[0] : 'Usuario');
                             console.log('[Auth] Auto-registrando usuario nuevo (' + provider + '):', displayName);
                             UserSession.set('user');
                             isAllowed = true;
                             isNewUser = true;
-                            // Fire-and-forget: el registro en users.json se hace en background
-                            // para no bloquear el redirect al dashboard
-                            // Plan 'free' por defecto: el usuario empezara con la cuenta a 0
-                            // hasta que contrate un plan real
-                            Promise.allSettled([
-                                registerUser(supabaseClient, displayName, email, 'free', ''),
-                                recordAccess(supabaseClient, email, 'registro', 'user')
-                            ]).then(results => {
-                                console.log('[Auth] Auto-registro background completado', results);
-                            });
+                            // Esperamos al registro en users.json antes de continuar: si lo
+                            // hacemos fire-and-forget y el save falla (p.ej. 400 de Storage),
+                            // el usuario nunca aparece en el panel de admin. Preferimos un
+                            // pequeno delay en el redirect a perder usuarios reales.
+                            try {
+                                await registerUser(supabaseClient, displayName, email, 'free', '');
+                                console.log('[Auth] Usuario Google/OAuth guardado en users.json OK');
+                            } catch (saveErr) {
+                                console.error('[Auth] FALLO guardando usuario Google/OAuth en users.json:', saveErr);
+                            }
+                            try {
+                                await recordAccess(supabaseClient, email, 'registro', 'user');
+                            } catch (accErr) {
+                                console.warn('[Auth] Fallo registrando acceso:', accErr);
+                            }
                         }
                     } catch(e) { console.error('Error cargando usuarios permitidos:', e); }
                 }
@@ -2391,22 +2395,25 @@ async function saveUsers(sb, users) {
 
 async function registerUser(sb, name, email, plan, province) {
     if (!sb || !CONFIG.SUPABASE_URL) return;
-    try {
-        const ip = await getPublicIP();
-        const browser = getBrowserInfo();
-        const users = await loadUsers(sb);
-        users.unshift({
-            id: Date.now().toString(),
-            date: new Date().toISOString(),
-            name: name || '',
-            email: email || '',
-            plan: plan || 'pro',
-            province: province || '',
-            ip,
-            browser
-        });
-        await saveUsers(sb, users);
-    } catch (e) { console.warn('Error registrando usuario:', e); }
+    const ip = await getPublicIP().catch(() => '');
+    const browser = getBrowserInfo();
+    const users = await loadUsers(sb);
+    // Evitar duplicados: si ya existe por email, no lo anadimos otra vez
+    if (users.some(u => u.email && u.email.toLowerCase() === (email || '').toLowerCase())) {
+        return;
+    }
+    users.unshift({
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        name: name || '',
+        email: email || '',
+        plan: plan || 'pro',
+        province: province || '',
+        ip,
+        browser
+    });
+    const { error } = await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(USERS_FILE, new Blob([JSON.stringify(users, null, 2)], { type: 'application/json' }), { upsert: true, contentType: 'application/json' });
+    if (error) throw error;
 }
 
 function renderUsersList(users, sb) {
