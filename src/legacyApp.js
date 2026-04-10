@@ -1657,10 +1657,18 @@ export function initializeAppLogic() {
                 const password = generateVipPassword();
                 const djName = djEmail.split('@')[0];
 
-                // 2. Crear el usuario en Supabase Auth (con la contrasena generada)
-                //    Nota: Supabase enviara tambien su propio email de verificacion.
-                //    El DJ debera confirmar su correo antes de poder iniciar sesion.
-                const { error: signUpErr } = await supabaseClient.auth.signUp({
+                // 2. Crear el usuario en Supabase Auth con un cliente SECUNDARIO
+                //    que no persiste sesion. Si usaramos el cliente principal y la
+                //    confirmacion de email esta desactivada, Supabase devolveria
+                //    una sesion del DJ y sobrescribiria la sesion del admin en
+                //    localStorage (el admin se quedaria fuera). Con un cliente
+                //    aparte sin persistencia eso no ocurre.
+                /** @type {any} */
+                const win = window;
+                const vipClient = win.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+                    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+                });
+                const { error: signUpErr } = await vipClient.auth.signUp({
                     email: djEmail,
                     password: password,
                     options: {
@@ -1708,7 +1716,7 @@ export function initializeAppLogic() {
                 if (emailSent) {
                     const extra = alreadyRegistered
                         ? 'La cuenta ya existia: hemos actualizado su plan a colaborador.'
-                        : 'Ademas, Supabase le enviara un correo de verificacion que debera confirmar antes de iniciar sesion.';
+                        : 'Ya puede iniciar sesion inmediatamente con la contrasena del correo.';
                     BSAlert(`📩 Invitacion VIP enviada a ${djEmail}. ${extra}`);
                 } else {
                     // Fallback: mostrar credenciales al admin para envio manual
