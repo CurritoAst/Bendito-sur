@@ -5,6 +5,7 @@
 
 import { CONFIG } from './config.js';
 import { buildStripeCheckoutUrl, STRIPE_PLAN_PRICES } from './stripeConfig.js';
+import { sendVipInviteEmail, isEmailJSConfigured, generateVipPassword } from './emailConfig.js';
 
 // === MODAL SYSTEM ===
 
@@ -908,7 +909,14 @@ export function initializeAppLogic() {
                         const userFound = usersList.find(u => u.email.toLowerCase() === email.toLowerCase());
                         if (userFound) {
                             console.log('[Auth] Usuario existente encontrado');
-                            UserSession.set('user');
+                            // Si el plan es 'colaborador', el usuario tiene rol de colaborador
+                            // (acceso total vitalicio sin coste, invitacion VIP del admin).
+                            const planLower = String(userFound.plan || '').toLowerCase();
+                            if (planLower === 'colaborador' || planLower === 'collab') {
+                                UserSession.set('collab');
+                            } else {
+                                UserSession.set('user');
+                            }
                             isAllowed = true;
                         } else {
                             // Cualquier usuario con sesion Supabase valida (Google, Spotify, email, ...)
@@ -1583,21 +1591,137 @@ export function initializeAppLogic() {
         });
     }
 
+    // Modal de fallback que muestra las credenciales al admin cuando EmailJS
+    // no esta configurado, para que pueda enviarlas manualmente al DJ.
+    const showVipCredentialsModal = (djEmail, password) => {
+        const overlay = document.createElement('div');
+        overlay.setAttribute('data-modal-open', 'true');
+        overlay.style.cssText = `
+            position: fixed; inset: 0; z-index: 100000;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 1rem;
+        `;
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: linear-gradient(180deg, #141414 0%, #0a0a0a 100%);
+            border: 1px solid rgba(247,168,0,0.35); border-radius: 8px;
+            max-width: 520px; width: 100%; padding: 2rem;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.8);
+        `;
+        card.innerHTML = `
+            <div style="text-align: center; margin-bottom: 1.2rem;">
+                <div style="font-size: 2rem;">📩</div>
+                <h3 style="font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 2px; color: #fff; margin: 0.4rem 0;">Cuenta VIP creada</h3>
+                <p style="font-size: 0.85rem; color: #a0a0a0; margin: 0;">EmailJS no esta configurado, asi que te mostramos las credenciales aqui. Copialas y envialas manualmente al DJ.</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(247,168,0,0.2); border-radius: 4px; padding: 1rem; margin-bottom: 1rem; font-family: monospace;">
+                <div style="color: #888; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;">Email</div>
+                <div style="color: #fff; font-size: 0.95rem; margin-bottom: 0.8rem; word-break: break-all;">${djEmail}</div>
+                <div style="color: #888; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;">Contrasena</div>
+                <div style="color: var(--gold, #f3c948); font-size: 1.05rem; font-weight: 700;">${password}</div>
+            </div>
+            <button class="bs-vip-copy" style="width: 100%; padding: 0.8rem; margin-bottom: 0.5rem; background: var(--gold, #f3c948); color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: 700; letter-spacing: 1px;">Copiar credenciales</button>
+            <button class="bs-vip-close" style="width: 100%; padding: 0.8rem; background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #888; border-radius: 4px; cursor: pointer;">Cerrar</button>
+        `;
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        card.querySelector('.bs-vip-copy').addEventListener('click', () => {
+            const txt = `Bendito Sur VIP\nEmail: ${djEmail}\nContrasena: ${password}\nLogin: https://benditosur.es`;
+            navigator.clipboard?.writeText(txt).then(
+                () => BSAlert('✅ Credenciales copiadas al portapapeles.'),
+                () => BSAlert('❌ No se pudo copiar. Seleccionalas manualmente.')
+            );
+        });
+        const close = () => { try { overlay.remove(); } catch (e) { /* noop */ } };
+        card.querySelector('.bs-vip-close').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    };
+
     const inviteForm = document.getElementById('invite-collab-form');
     if (inviteForm) {
-        inviteForm.addEventListener('submit', (e) => {
+        inviteForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = inviteForm.querySelector('button');
+            const emailInput = inviteForm.querySelector('input[type="email"]');
+            const djEmail = emailInput?.value?.trim() || '';
+            if (!djEmail) { BSAlert('❌ Introduce el correo del DJ.'); return; }
+            if (!supabaseClient) { BSAlert('❌ Supabase no esta conectado.'); return; }
+
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Enviando...';
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Creando cuenta VIP...';
             btn.disabled = true;
 
-            setTimeout(() => {
+            try {
+                // 1. Generar contrasena aleatoria segura
+                const password = generateVipPassword();
+                const djName = djEmail.split('@')[0];
+
+                // 2. Crear el usuario en Supabase Auth (con la contrasena generada)
+                //    Nota: Supabase enviara tambien su propio email de verificacion.
+                //    El DJ debera confirmar su correo antes de poder iniciar sesion.
+                const { error: signUpErr } = await supabaseClient.auth.signUp({
+                    email: djEmail,
+                    password: password,
+                    options: {
+                        data: { invited_as: 'colaborador', full_name: djName }
+                    }
+                });
+                if (signUpErr && !String(signUpErr.message || '').toLowerCase().includes('already')) {
+                    throw signUpErr;
+                }
+                const alreadyRegistered = !!signUpErr; // usuario ya existente
+
+                // 3. Alta en users.json con plan='colaborador'
+                //    Si ya existia, lo actualizamos para marcarlo como colaborador.
+                try {
+                    const users = await loadUsers(supabaseClient);
+                    const idx = users.findIndex(u => u.email && u.email.toLowerCase() === djEmail.toLowerCase());
+                    if (idx === -1) {
+                        await registerUser(supabaseClient, djName, djEmail, 'colaborador', '');
+                    } else {
+                        users[idx].plan = 'colaborador';
+                        users[idx].planActivatedAt = new Date().toISOString();
+                        await saveUsers(supabaseClient, users);
+                    }
+                    await recordAccess(supabaseClient, djEmail, 'invitacion-vip', 'collab');
+                } catch (e) {
+                    console.warn('No se pudo guardar el colaborador en users.json:', e);
+                }
+
+                // 4. Enviar email con las credenciales (via EmailJS si esta configurado)
+                let emailSent = false;
+                if (isEmailJSConfigured()) {
+                    try {
+                        await sendVipInviteEmail({
+                            toEmail: djEmail,
+                            toName: djName,
+                            password: password,
+                            loginUrl: 'https://benditosur.es'
+                        });
+                        emailSent = true;
+                    } catch (mailErr) {
+                        console.error('Error enviando email VIP via EmailJS:', mailErr);
+                    }
+                }
+
+                if (emailSent) {
+                    const extra = alreadyRegistered
+                        ? 'La cuenta ya existia: hemos actualizado su plan a colaborador.'
+                        : 'Ademas, Supabase le enviara un correo de verificacion que debera confirmar antes de iniciar sesion.';
+                    BSAlert(`📩 Invitacion VIP enviada a ${djEmail}. ${extra}`);
+                } else {
+                    // Fallback: mostrar credenciales al admin para envio manual
+                    showVipCredentialsModal(djEmail, password);
+                }
+                inviteForm.reset();
+            } catch (err) {
+                console.error('Error creando invitacion VIP:', err);
+                BSAlert('❌ Error creando la invitacion: ' + (err?.message || 'desconocido'));
+            } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                BSAlert('📩 Invitación VIP enviada con éxito. El usuario recibirá un enlace para activar su acceso vitalicio gratuito.');
-                inviteForm.reset();
-            }, 1000);
+            }
         });
     }
 
