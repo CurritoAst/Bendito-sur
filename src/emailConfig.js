@@ -31,9 +31,9 @@
 // 8. ¡Listo! Las invitaciones VIP se enviaran de verdad al Gmail del DJ.
 
 export const EMAILJS_CONFIG = {
-    SERVICE_ID:  '',  // p.ej. 'service_abc1234'
-    TEMPLATE_ID: '',  // p.ej. 'template_xyz5678'
-    PUBLIC_KEY:  '',  // p.ej. 'abcDEF123456789'
+    SERVICE_ID:  'service_r7m8pdl',
+    TEMPLATE_ID: 'template_7x8yqsh',
+    PUBLIC_KEY:  'fW9hczsIf_4dcD7sX',
 };
 
 export const isEmailJSConfigured = () => {
