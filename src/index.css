@@ -2,6 +2,14 @@
    Bendito Sur — Diseño Editorial
    ========================================= */
 
+@font-face {
+    font-family: 'Retroforge';
+    src: url('./assets/fonts/Retroforge.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     --bg:       #0A0806;
     --bg-alt:   #110D08;
@@ -22,6 +30,7 @@
 
     --font-display: 'Bebas Neue', sans-serif;
     --font-body:    'Space Grotesk', sans-serif;
+    --font-logo:    'Retroforge', sans-serif;
 
     --radius: 0px;
     --radius-sm: 2px;
@@ -118,9 +127,10 @@ p { color: var(--warm); line-height: 1.75; }
 
 .logo {
     display: flex; align-items: center; gap: 0.5rem;
-    font-family: var(--font-display);
+    font-family: var(--font-logo);
     font-size: 1.5rem; letter-spacing: 3px;
 }
+.font-logo { font-family: var(--font-logo) !important; font-weight: normal; }
 .logo i { color: var(--gold); font-size: 1.3rem; }
 
 .nav-links { display: flex; gap: 2rem; }

@@ -101,7 +101,7 @@ export default function App() {
                     border: '1px solid rgba(247,168,0,0.2)', borderRadius: '12px',
                     background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)'
                 }}>
-                    <div style={{ fontSize: '3rem', fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '3rem', fontFamily: 'var(--font-logo)', letterSpacing: '6px', color: '#fff', marginBottom: '0.25rem' }}>
                         BENDITO<em style={{ fontStyle: 'normal', color: 'transparent', WebkitTextStroke: '1px #f3c948' }}>SUR.</em>
                     </div>
                     <div style={{
@@ -252,7 +252,7 @@ export default function App() {
                 <div className="auth-brand">
                     <div className="auth-brand-content">
                         <span className="hero-kicker" style={{ "marginBottom": "0.5rem" }}><i className="ph-fill ph-crown"></i> ACCESO DJ RESIDENTE</span>
-                        <h2>BENDITO<em>SUR.</em></h2>
+                        <h2 className="font-logo">BENDITO<em>SUR.</em></h2>
                         <p>Plataforma exclusiva para el talento de Andalucía. Sonido de club real, máxima resolución.</p>
                     </div>
                 </div>
@@ -261,7 +261,7 @@ export default function App() {
                 <div className="auth-form-side">
                     <div className="auth-container-premium">
                         <div className="auth-header-mobile">
-                            <h2 style={{ "fontSize": "2.2rem", "marginBottom": "2rem", "display": "none" }} className="mobile-only-title">BENDITO<em style={{ "fontStyle": "normal", "color": "transparent", "WebkitTextStroke": "1px var(--gold)" }}>SUR.</em></h2>
+                            <h2 style={{ "fontSize": "2.2rem", "marginBottom": "2rem", "display": "none" }} className="mobile-only-title font-logo">BENDITO<em style={{ "fontStyle": "normal", "color": "transparent", "WebkitTextStroke": "1px var(--gold)" }}>SUR.</em></h2>
                         </div>
 
                         <div className="auth-tabs">
@@ -368,7 +368,7 @@ export default function App() {
             <div className="hero-section">
                 <div className="hero-left">
                     <span className="hero-kicker">Hecho en Andalucia</span>
-                    <h1 className="hero-title">BENDITO<em>SUR.</em></h1>
+                    <h1 className="hero-title font-logo">BENDITO<em>SUR.</em></h1>
                     <p className="hero-description">
                         La plataforma premium para DJs del sur. Musica exclusiva curada a mano,
                         calidad sin compromisos — WAV y FLAC — y una comunidad de verdad.
