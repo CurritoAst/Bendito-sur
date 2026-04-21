@@ -1825,6 +1825,162 @@ export function initializeAppLogic() {
 
     // 15. PANEL DE USUARIOS — Lista de registrados
     initUsersPanel(supabaseClient);
+
+    // 16. WOW LAYER — scroll reveal + hero ring reactivo al audio
+    initWowLayer();
+}
+
+// ─── WOW LAYER ───────────────────────────────────────────────────────────────
+// Scroll reveal con IntersectionObserver + elemento visual reactivo al audio.
+
+function markRevealTargets() {
+    // Marcamos secciones y filas que no tengan el attr ya puesto
+    const candidates = [
+        '.hero-left', '.hero-right',
+        '.benefits-intro', '.benefit-row',
+        '.pricing-intro', '.pricing-col',
+        '.library-head',
+        '.roster-head', '.dj-card',
+        '.events-head', '.event-card',
+        '.dashboard-card',
+    ];
+    candidates.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            if (!el.hasAttribute('data-reveal')) el.setAttribute('data-reveal', '');
+        });
+    });
+
+    // Containers con stagger (hijos aparecen escalonados)
+    ['.pricing-cols', '.roster-grid', '.events-grid', '.hero-stats'].forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+            if (!el.hasAttribute('data-reveal-stagger')) el.setAttribute('data-reveal-stagger', '');
+        });
+    });
+}
+
+function initScrollReveal() {
+    markRevealTargets();
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+        // Hacemos visible todo sin animación
+        document.querySelectorAll('[data-reveal], [data-reveal-stagger]').forEach(el => {
+            el.classList.add('is-visible');
+        });
+        return;
+    }
+    if (!('IntersectionObserver' in window)) {
+        document.querySelectorAll('[data-reveal], [data-reveal-stagger]').forEach(el => {
+            el.classList.add('is-visible');
+        });
+        return;
+    }
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                io.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('[data-reveal], [data-reveal-stagger]').forEach(el => io.observe(el));
+}
+
+// Re-escanea cuando se navega a otra vista (los targets pueden cambiar de estado)
+function refreshScrollReveal() {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+    // Si la vista activa cambia, reseteamos los elementos aún no visibles de esa vista
+    const activeView = document.querySelector('.view.active');
+    if (!activeView) return;
+    activeView.querySelectorAll('[data-reveal], [data-reveal-stagger]').forEach(el => {
+        // Si no está visible aún y está dentro de viewport, lo mostramos
+        const rect = el.getBoundingClientRect();
+        const inView = rect.top < window.innerHeight * 0.9 && rect.bottom > 0;
+        if (inView) el.classList.add('is-visible');
+    });
+}
+
+// Hero ring reactivo al audio del player global
+function initAudioReactive() {
+    const audio = document.getElementById('bs-audio');
+    const ring  = document.querySelector('.hero-ring-wrap');
+    const strip = document.querySelector('.sur-strip');
+    if (!audio || !ring) return;
+
+    /** @type {any} */ const w = window;
+    const AC = w.AudioContext || w.webkitAudioContext;
+    if (!AC) return;
+
+    let ctx = null;
+    let analyser = null;
+    let source = null;
+    let dataArray = null;
+    let rafId = null;
+    let started = false;
+
+    const onPlay = () => {
+        ring.classList.add('is-audio-playing');
+        if (strip) strip.classList.add('is-audio-playing');
+        if (!started) {
+            try {
+                ctx = new AC();
+                source = ctx.createMediaElementSource(audio);
+                analyser = ctx.createAnalyser();
+                analyser.fftSize = 64;
+                source.connect(analyser);
+                analyser.connect(ctx.destination);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                started = true;
+            } catch (e) {
+                // createMediaElementSource solo puede llamarse una vez
+                console.warn('[WOW] AudioContext init failed:', e && e.message);
+            }
+        }
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+        loop();
+    };
+
+    const onPauseOrEnd = () => {
+        ring.classList.remove('is-audio-playing');
+        if (strip) strip.classList.remove('is-audio-playing');
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        ring.style.setProperty('--bs-beat', '0');
+    };
+
+    const loop = () => {
+        if (!analyser || !dataArray) { rafId = requestAnimationFrame(loop); return; }
+        analyser.getByteFrequencyData(dataArray);
+        // Foco en los graves (primeros bins) para sensación "kick"
+        let sum = 0;
+        const lowBins = Math.min(6, dataArray.length);
+        for (let i = 0; i < lowBins; i++) sum += dataArray[i];
+        const avg = sum / lowBins / 255; // 0..1
+        // Suavizado simple con easing
+        const beat = Math.min(1, avg * 1.3);
+        ring.style.setProperty('--bs-beat', beat.toFixed(3));
+        rafId = requestAnimationFrame(loop);
+    };
+
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPauseOrEnd);
+    audio.addEventListener('ended', onPauseOrEnd);
+}
+
+function initWowLayer() {
+    // Pequeño delay para que legacyApp haya inyectado contenido dinámico (cards, filas)
+    setTimeout(() => {
+        initScrollReveal();
+        initAudioReactive();
+    }, 60);
+
+    // Cada vez que se cambia de vista, re-evaluamos reveals
+    document.addEventListener('click', (ev) => {
+        /** @type {any} */ const t = ev.target;
+        if (t && t.closest && (t.closest('[data-target]') || t.closest('[data-admin-target]'))) {
+            setTimeout(refreshScrollReveal, 80);
+        }
+    });
 }
 
 // ─── CATALOG SYSTEM (Storage JSON — sin base de datos) ───────────────────────

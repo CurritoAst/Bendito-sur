@@ -1601,3 +1601,219 @@ main { padding-top: 64px; min-height: 100vh; }
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(243,201,72,0.4), transparent);
 }
+
+/* =====================================================================
+   WOW LAYER — scroll reveal, view transitions, microinteracciones,
+   elemento reactivo al audio y pulidos mobile.
+   ===================================================================== */
+
+/* --- Scroll reveal: estado inicial oculto, visible al entrar en viewport --- */
+@media (prefers-reduced-motion: no-preference) {
+    [data-reveal] {
+        opacity: 0;
+        transform: translateY(28px);
+        transition: opacity 0.8s cubic-bezier(.22,.61,.36,1),
+                    transform 0.8s cubic-bezier(.22,.61,.36,1);
+        will-change: opacity, transform;
+    }
+    [data-reveal="left"]   { transform: translateX(-32px); }
+    [data-reveal="right"]  { transform: translateX(32px);  }
+    [data-reveal="scale"]  { transform: scale(0.94); }
+    [data-reveal].is-visible {
+        opacity: 1;
+        transform: none;
+    }
+    /* Stagger dentro de una lista (fila de beneficios, cards, etc.) */
+    [data-reveal-stagger] > * {
+        opacity: 0;
+        transform: translateY(22px);
+        transition: opacity 0.7s cubic-bezier(.22,.61,.36,1),
+                    transform 0.7s cubic-bezier(.22,.61,.36,1);
+    }
+    [data-reveal-stagger].is-visible > * { opacity: 1; transform: none; }
+    [data-reveal-stagger].is-visible > *:nth-child(1) { transition-delay: 0.05s; }
+    [data-reveal-stagger].is-visible > *:nth-child(2) { transition-delay: 0.15s; }
+    [data-reveal-stagger].is-visible > *:nth-child(3) { transition-delay: 0.25s; }
+    [data-reveal-stagger].is-visible > *:nth-child(4) { transition-delay: 0.35s; }
+    [data-reveal-stagger].is-visible > *:nth-child(5) { transition-delay: 0.45s; }
+    [data-reveal-stagger].is-visible > *:nth-child(6) { transition-delay: 0.55s; }
+}
+
+/* --- Transición de vista (cambio entre secciones SPA) --- */
+@keyframes bs-view-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0);   }
+}
+.view.active {
+    animation: bs-view-in 0.45s cubic-bezier(.22,.61,.36,1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+    .view.active { animation: none; }
+}
+
+/* --- Microinteracciones --- */
+
+/* Botones primarios: lift + glow al pasar por encima */
+.btn-primary {
+    position: relative;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(243,201,72,0.35), var(--gold-glow-sm);
+    filter: brightness(1.06);
+}
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.96);
+}
+
+/* Outline buttons — fill sutil en hover */
+.btn-outline {
+    transition: border-color 0.25s ease, color 0.25s ease,
+                background 0.25s ease, transform 0.25s ease;
+}
+.btn-outline:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(243,201,72,0.08);
+}
+
+/* Nav items: slide gradiente inferior */
+.nav-item {
+    position: relative;
+    transition: color 0.2s ease;
+}
+.nav-item::after {
+    content: '';
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    bottom: -6px;
+    height: 2px;
+    background: var(--gold-grad);
+    border-radius: 2px;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.35s cubic-bezier(.22,.61,.36,1);
+    pointer-events: none;
+}
+.nav-item:hover::after,
+.nav-item.active::after { transform: scaleX(1); }
+
+/* Filas del catálogo: hover lift + sombra dorada */
+.library-table tbody tr {
+    transition: background 0.2s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.library-table tbody tr:hover {
+    transform: translateX(4px);
+    background: rgba(243,201,72,0.05);
+    box-shadow: inset 3px 0 0 0 var(--gold);
+}
+
+/* DJ cards y event cards: lift con sombra dorada */
+.dj-card, .event-card {
+    transition: transform 0.35s cubic-bezier(.22,.61,.36,1),
+                box-shadow 0.35s ease,
+                border-color 0.35s ease;
+}
+.dj-card:hover, .event-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(243,201,72,0.35);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45), var(--gold-glow-sm);
+}
+
+/* Pricing cols: lift en hover */
+.pricing-col {
+    transition: transform 0.4s cubic-bezier(.22,.61,.36,1),
+                box-shadow 0.4s ease;
+}
+.pricing-col:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 60px rgba(0,0,0,0.55);
+}
+.pricing-col.featured:hover { box-shadow: 0 25px 60px rgba(0,0,0,0.6), var(--gold-glow); }
+
+/* Inputs premium — focus ring dorado */
+.form-group-premium input:focus,
+.filter-input:focus,
+.filter-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(243,201,72,0.35);
+    transition: box-shadow 0.2s ease;
+}
+
+/* --- Hero ring reactivo (clase aplicada por JS mientras suena audio) --- */
+@keyframes bs-pulse-ring {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(243,201,72,0.5); }
+    50%      { transform: scale(1.04); box-shadow: 0 0 32px 6px rgba(243,201,72,0.35); }
+}
+.hero-ring-wrap.is-audio-playing .ring-outer {
+    animation: bs-pulse-ring 1.1s ease-in-out infinite;
+}
+.hero-ring-wrap.is-audio-playing .ring-mid {
+    animation: bs-pulse-ring 1.4s ease-in-out infinite;
+    animation-delay: 0.15s;
+}
+.hero-ring-wrap.is-audio-playing .ring-inner {
+    text-shadow: 0 0 18px rgba(243,201,72,0.6);
+}
+/* Intensidad por volumen: variable --bs-beat (0..1) la pone el JS */
+.hero-ring-wrap {
+    --bs-beat: 0;
+    transition: filter 0.12s ease;
+    filter: drop-shadow(0 0 calc(var(--bs-beat) * 24px) rgba(243,201,72, calc(var(--bs-beat) * 0.6)));
+}
+
+/* Marquee SUR — ligero pulse de color cuando suena */
+.sur-strip.is-audio-playing .hl {
+    animation: bs-hl-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes bs-hl-pulse {
+    from { opacity: 0.85; }
+    to   { opacity: 1; text-shadow: 0 0 10px rgba(243,201,72,0.5); }
+}
+
+/* --- Player global: barra progreso con shimmer --- */
+#player-progress {
+    background: var(--gold-grad) !important;
+    position: relative;
+    overflow: hidden;
+}
+#player-progress::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+    transform: translateX(-100%);
+    animation: bs-shimmer 2.2s linear infinite;
+}
+@keyframes bs-shimmer {
+    to { transform: translateX(100%); }
+}
+
+/* --- Pulido mobile --- */
+@media (max-width: 720px) {
+    .library-table tbody tr:hover { transform: none; }
+    .dj-card:hover, .event-card:hover { transform: translateY(-3px); }
+    .pricing-col:hover { transform: translateY(-4px); }
+    /* Quitar stagger en mobile: todo visible de una */
+    [data-reveal-stagger].is-visible > * { transition-delay: 0.05s !important; }
+    /* Botón con tap-feedback más marcado */
+    .btn-primary:active { transform: scale(0.97); }
+}
+
+/* Pulido accesibilidad: si el usuario prefiere reducir movimiento, apagamos lo intenso */
+@media (prefers-reduced-motion: reduce) {
+    .btn-primary:hover:not(:disabled),
+    .btn-outline:hover:not(:disabled),
+    .dj-card:hover, .event-card:hover, .pricing-col:hover,
+    .library-table tbody tr:hover {
+        transform: none;
+    }
+    .hero-ring-wrap.is-audio-playing .ring-outer,
+    .hero-ring-wrap.is-audio-playing .ring-mid,
+    .sur-strip.is-audio-playing .hl,
+    #player-progress::after {
+        animation: none !important;
+    }
+}
