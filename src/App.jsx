@@ -181,6 +181,8 @@ export default function App() {
                 <a href="#" className="nav-item active" data-target="home-view">Inicio</a>
                 <a href="#" className="nav-item" data-target="pricing-view">Planes</a>
                 <a href="#" className="nav-item" data-target="library-view">Biblioteca</a>
+                <a href="#" className="nav-item" data-target="packs-view">Packs</a>
+                <a href="#" className="nav-item" data-target="free-view">Gratis</a>
                 <a href="#" className="nav-item" data-target="roster-view">Comunidad</a>
                 <a href="#" className="nav-item" data-target="events-view">Eventos</a>
                 <a href="#" className="nav-item" data-target="dashboard-view">Mi Cuenta</a>
@@ -192,6 +194,8 @@ export default function App() {
                 <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-security">Seguridad</a>
                 <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-users">Usuarios y Altas</a>
                 <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-catalog"><i className="ph ph-music-notes-plus"></i> Catálogo</a>
+                <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-packs"><i className="ph ph-stack"></i> Packs</a>
+                <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-free"><i className="ph ph-gift"></i> Gratis</a>
                 <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-export"><i className="ph ph-package"></i> Exportación</a>
             </div>
             <div className="nav-actions">
@@ -217,6 +221,8 @@ export default function App() {
             <a href="#" className="nav-item active" data-target="home-view">Inicio</a>
             <a href="#" className="nav-item" data-target="pricing-view">Planes</a>
             <a href="#" className="nav-item" data-target="library-view">Biblioteca</a>
+            <a href="#" className="nav-item" data-target="packs-view">Packs</a>
+            <a href="#" className="nav-item" data-target="free-view">Gratis</a>
             <a href="#" className="nav-item" data-target="roster-view">Comunidad</a>
             <a href="#" className="nav-item" data-target="events-view">Eventos</a>
             <a href="#" className="nav-item" data-target="dashboard-view">Mi Cuenta</a>
@@ -226,6 +232,8 @@ export default function App() {
             <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-security">Seguridad</a>
             <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-users">Usuarios y Altas</a>
             <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-catalog">Catálogo</a>
+            <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-packs">Packs</a>
+            <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-free">Gratis</a>
             <a href="#" className="nav-item admin-top-tab" data-admin-target="admin-export">Exportación</a>
         </div>
         <div className="mobile-nav-actions">
@@ -560,7 +568,69 @@ export default function App() {
             </div>
         </section>
 
-        
+        {/* === PACKS (venta por DJ) === */}
+        <section id="packs-view" className="view">
+            <div className="library-wrap">
+                <div className="library-head">
+                    <h2>Packs Exclusivos</h2>
+                    <div className="library-filters">
+                        <div className="filter-group">
+                            <i className="ph ph-magnifying-glass"></i>
+                            <input type="text" id="packs-search-input" placeholder="Buscar pack o DJ..." className="filter-input" />
+                        </div>
+                    </div>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginTop: '-1rem', marginBottom: '2rem', maxWidth: '640px' }}>
+                    Selecciones hechas por los DJs de Bendito Sur. Compra el pack y recibe todos los tracks al instante.
+                </p>
+                <div id="packs-grid" className="packs-grid">
+                    <div id="packs-empty" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.9rem', letterSpacing: '2px' }}>
+                        PACKS EN PREPARACIÓN
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {/* === CATÁLOGO GRATUITO === */}
+        <section id="free-view" className="view">
+            <div className="library-wrap">
+                <div className="library-head">
+                    <h2>Catálogo Gratuito</h2>
+                    <div className="library-filters">
+                        <div className="filter-group">
+                            <i className="ph ph-magnifying-glass"></i>
+                            <input type="text" id="free-search-input" placeholder="Buscar artista o título..." className="filter-input" />
+                        </div>
+                    </div>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', marginTop: '-1rem', marginBottom: '2rem', maxWidth: '640px' }}>
+                    Descarga libre para toda la comunidad. Sin registro, sin suscripción — regalo de la casa.
+                </p>
+                <div className="library-table-container">
+                    <table className="library-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Título</th>
+                                <th>Artista</th>
+                                <th>BPM</th>
+                                <th>Key</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="free-tracks-body">
+                            <tr id="free-empty-row">
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.9rem', letterSpacing: '2px' }}>
+                                    SIN TEMAS GRATIS TODAVÍA
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
         <section id="roster-view" className="view">
             <div className="roster-wrap">
                 <div className="roster-head">
@@ -1144,6 +1214,117 @@ export default function App() {
                                     <tbody id="admin-catalog-tbody">
                                         <tr id="admin-catalog-empty">
                                             <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '2px' }}>SIN PISTAS AÚN</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* === ADMIN: PACKS === */}
+                    <div id="admin-packs" className="admin-section mt-2">
+                        <div className="dashboard-section">
+                            <h3 className="dashboard-card-title mb-3"><i className="ph ph-stack"></i> Crear Nuevo Pack</h3>
+                            <form id="create-pack-form" style={{ marginBottom: '2rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Título del Pack *</label>
+                                        <input type="text" id="pack-title" required style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>DJ / Artista *</label>
+                                        <input type="text" id="pack-artist" required style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Precio (€) *</label>
+                                        <input type="number" id="pack-price" min="0" step="0.01" required style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Nº de tracks</label>
+                                        <input type="number" id="pack-tracks" min="1" step="1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                                    <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Descripción</label>
+                                    <textarea id="pack-description" rows="2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit' }}></textarea>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>URL Stripe Payment Link *</label>
+                                        <input type="url" id="pack-stripe-url" placeholder="https://buy.stripe.com/..." required style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>URL de descarga (.zip) *</label>
+                                        <input type="url" id="pack-download-url" placeholder="https://... archivo del pack completo" required style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                                    <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Carátula (opcional)</label>
+                                    <input type="file" id="pack-cover-input" accept="image/*" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem' }} />
+                                </div>
+                                <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', marginBottom: '1rem', lineHeight: '1.5' }}>
+                                    <i className="ph ph-info"></i> Configura en Stripe el Payment Link con la URL de retorno <code style={{ color: 'var(--gold)' }}>https://benditosur.es/?pack_success=PACK_ID</code> para que el cliente reciba el enlace de descarga automáticamente.
+                                </p>
+                                <button type="submit" className="btn btn-primary" style={{ minWidth: '200px' }}>
+                                    <i className="ph ph-plus-circle"></i> Crear Pack
+                                </button>
+                                <span id="pack-create-status" style={{ marginLeft: '1rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}></span>
+                            </form>
+
+                            <h3 className="dashboard-card-title mb-2"><i className="ph ph-list"></i> Packs publicados</h3>
+                            <div className="library-table-container">
+                                <table className="library-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Título</th>
+                                            <th>DJ</th>
+                                            <th>Precio</th>
+                                            <th>Tracks</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-packs-tbody">
+                                        <tr id="admin-packs-empty">
+                                            <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '2px' }}>SIN PACKS AÚN</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* === ADMIN: CATÁLOGO GRATUITO === */}
+                    <div id="admin-free" className="admin-section mt-2">
+                        <div className="dashboard-section">
+                            <h3 className="dashboard-card-title mb-3"><i className="ph ph-gift"></i> Subir Pistas Gratuitas</h3>
+                            <form id="upload-free-form" style={{ marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                                    <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Archivos de Audio *</label>
+                                    <input type="file" id="free-file-input" accept="audio/*" multiple style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(243,201,72,0.2)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', cursor: 'pointer' }} />
+                                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>Selecciona varios archivos a la vez. Artista y título salen del nombre (Artista - Título.wav).</span>
+                                </div>
+                                <div id="free-upload-file-list" style={{ marginBottom: '1rem' }}></div>
+                                <button type="submit" className="btn btn-primary" id="upload-free-btn" style={{ minWidth: '180px' }}>
+                                    <i className="ph ph-upload-simple"></i> Subir Gratis
+                                </button>
+                                <span id="free-upload-progress-text" style={{ marginLeft: '1rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}></span>
+                            </form>
+
+                            <h3 className="dashboard-card-title mb-2"><i className="ph ph-list-music"></i> Catálogo Gratuito</h3>
+                            <div className="library-table-container">
+                                <table className="library-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Título</th>
+                                            <th>Artista</th>
+                                            <th>BPM</th>
+                                            <th>Key</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-free-tbody">
+                                        <tr id="admin-free-empty">
+                                            <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '2px' }}>SIN TEMAS GRATIS AÚN</td>
                                         </tr>
                                     </tbody>
                                 </table>

@@ -1826,7 +1826,16 @@ export function initializeAppLogic() {
     // 15. PANEL DE USUARIOS — Lista de registrados
     initUsersPanel(supabaseClient);
 
-    // 16. WOW LAYER — scroll reveal + hero ring reactivo al audio
+    // 16. PACKS — Venta por DJ con Stripe Payment Links
+    initPacks(supabaseClient);
+
+    // 17. CATÁLOGO GRATUITO — Tracks con descarga libre
+    initFreeCatalog(supabaseClient);
+
+    // 18. Retorno desde Stripe tras comprar un pack
+    handlePackPurchaseReturn(supabaseClient);
+
+    // 19. WOW LAYER — scroll reveal + hero ring reactivo al audio
     initWowLayer();
 }
 
@@ -2965,5 +2974,481 @@ async function initUsersPanel(sb) {
             refreshBtn.disabled = false;
         });
     }
+}
+
+// ─── PACKS (venta por DJ via Stripe Payment Links) ───────────────────────────
+//
+// Flujo: admin crea pack con precio + URL de Stripe Payment Link + URL de descarga.
+// El comprador pulsa "Comprar", paga en Stripe, Stripe le redirige de vuelta a
+// benditosur.es/?pack_success=<packId> y la web muestra un modal con el botón
+// de descarga. Advertencia: sin backend, la URL de descarga se puede adivinar
+// si alguien conoce el ID — aceptable para un MVP en pruebas.
+
+const PACKS_FILE = 'packs.json';
+
+let _currentPacks = [];
+
+async function loadPacks(sb) {
+    try {
+        const url = `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${PACKS_FILE}?t=${Date.now()}`;
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+async function savePacks(sb, packs) {
+    const blob = new Blob([JSON.stringify(packs, null, 2)], { type: 'application/json' });
+    await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(PACKS_FILE, blob, { upsert: true, contentType: 'application/json' });
+}
+
+function makePackId() {
+    return 'pack_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function formatPrice(n) {
+    const num = Number(n);
+    if (!isFinite(num)) return '—';
+    return num.toFixed(2).replace('.', ',') + ' €';
+}
+
+function renderPackCard(pack) {
+    const grid = document.getElementById('packs-grid');
+    if (!grid) return;
+    const empty = document.getElementById('packs-empty');
+    if (empty) empty.remove();
+
+    const card = document.createElement('div');
+    card.className = 'pack-card';
+    card.setAttribute('data-id', pack.id);
+    card.setAttribute('data-search', ((pack.title || '') + ' ' + (pack.artist || '')).toLowerCase());
+
+    const coverHtml = pack.cover_url
+        ? `<img src="${escapeHtml(pack.cover_url)}" alt="${escapeHtml(pack.title)}" class="pack-cover-img" />`
+        : `<div class="pack-cover-fallback"><i class="ph-fill ph-stack"></i></div>`;
+
+    const tracksLine = pack.tracks_count ? `<span class="pack-meta-item"><i class="ph ph-music-notes"></i> ${pack.tracks_count} tracks</span>` : '';
+
+    card.innerHTML = `
+        <div class="pack-cover">
+            ${coverHtml}
+            <div class="pack-price-badge">${formatPrice(pack.price)}</div>
+        </div>
+        <div class="pack-body">
+            <h3 class="pack-title">${escapeHtml(pack.title)}</h3>
+            <p class="pack-artist"><i class="ph ph-user-sound"></i> ${escapeHtml(pack.artist)}</p>
+            ${pack.description ? `<p class="pack-description">${escapeHtml(pack.description)}</p>` : ''}
+            <div class="pack-meta">${tracksLine}</div>
+            <a href="${escapeHtml(pack.stripe_url)}" target="_blank" rel="noopener" class="btn btn-primary w-100 pack-buy-btn">
+                <i class="ph ph-shopping-cart-simple"></i> Comprar ${formatPrice(pack.price)}
+            </a>
+        </div>
+    `;
+    grid.appendChild(card);
+}
+
+function renderAdminPackRow(pack, sb, allPacks) {
+    const tbody = document.getElementById('admin-packs-tbody');
+    const empty = document.getElementById('admin-packs-empty');
+    if (empty) empty.remove();
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-id', pack.id);
+    tr.innerHTML = `
+        <td class="font-medium">${escapeHtml(pack.title)}</td>
+        <td class="text-secondary">${escapeHtml(pack.artist)}</td>
+        <td class="text-gold">${formatPrice(pack.price)}</td>
+        <td class="text-secondary">${pack.tracks_count || '—'}</td>
+        <td><button class="delete-pack-btn" title="Eliminar" style="background:none;border:1px solid rgba(255,80,80,0.3);border-radius:4px;padding:4px 10px;color:#ff5050;font-size:0.9rem;cursor:pointer">🗑️</button></td>
+    `;
+    tr.querySelector('.delete-pack-btn').addEventListener('click', () => {
+        BSConfirm(`¿Eliminar el pack "${pack.title}"?`).then(async ok => {
+            if (!ok) return;
+            const updated = allPacks.filter(p => p.id !== pack.id);
+            allPacks.length = 0; updated.forEach(p => allPacks.push(p));
+            _currentPacks = allPacks;
+            await savePacks(sb, allPacks);
+            tr.remove();
+            document.querySelector(`.pack-card[data-id="${pack.id}"]`)?.remove();
+            BSAlert('✅ Pack eliminado.');
+        });
+    });
+    tbody.appendChild(tr);
+}
+
+async function initPacks(sb) {
+    if (!CONFIG.SUPABASE_URL) return;
+
+    const packs = await loadPacks(sb);
+    _currentPacks = packs;
+
+    packs.forEach(p => {
+        renderPackCard(p);
+        renderAdminPackRow(p, sb, packs);
+    });
+
+    // Buscador
+    const searchInput = document.getElementById('packs-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            /** @type {any} */ const t = e.target;
+            const q = (t.value || '').toLowerCase().trim();
+            document.querySelectorAll('#packs-grid .pack-card').forEach(card => {
+                /** @type {any} */ const c = card;
+                const hay = c.getAttribute('data-search') || '';
+                c.style.display = (!q || hay.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
+    // Formulario admin: crear pack
+    const form = document.getElementById('create-pack-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('pack-create-status');
+        const titleEl = /** @type {HTMLInputElement} */ (document.getElementById('pack-title'));
+        const artistEl = /** @type {HTMLInputElement} */ (document.getElementById('pack-artist'));
+        const priceEl = /** @type {HTMLInputElement} */ (document.getElementById('pack-price'));
+        const tracksEl = /** @type {HTMLInputElement} */ (document.getElementById('pack-tracks'));
+        const descEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('pack-description'));
+        const stripeEl = /** @type {HTMLInputElement} */ (document.getElementById('pack-stripe-url'));
+        const dlEl = /** @type {HTMLInputElement} */ (document.getElementById('pack-download-url'));
+        const coverInput = /** @type {HTMLInputElement} */ (document.getElementById('pack-cover-input'));
+
+        const title = titleEl.value.trim();
+        const artist = artistEl.value.trim();
+        const price = parseFloat(priceEl.value);
+        const stripeUrl = stripeEl.value.trim();
+        const downloadUrl = dlEl.value.trim();
+
+        if (!title || !artist || !isFinite(price) || !stripeUrl || !downloadUrl) {
+            BSAlert('⚠️ Rellena título, DJ, precio, Stripe URL y URL de descarga.');
+            return;
+        }
+
+        if (statusEl) statusEl.textContent = 'Creando...';
+
+        // Subir carátula si hay
+        let coverUrl = '';
+        try {
+            if (coverInput && coverInput.files && coverInput.files[0]) {
+                const f = coverInput.files[0];
+                const safe = f.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+                const path = `packs/covers/${Date.now()}_${safe}`;
+                const { error: upErr } = await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(path, f, { upsert: false });
+                if (upErr) throw upErr;
+                const { data: urlData } = sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(path);
+                coverUrl = urlData.publicUrl;
+            }
+        } catch (err) {
+            console.warn('No se pudo subir la carátula:', err);
+        }
+
+        const newPack = {
+            id: makePackId(),
+            title,
+            artist,
+            price,
+            description: descEl.value.trim(),
+            tracks_count: tracksEl.value ? parseInt(tracksEl.value) : null,
+            stripe_url: stripeUrl,
+            download_url: downloadUrl,
+            cover_url: coverUrl,
+            created_at: new Date().toISOString(),
+        };
+
+        packs.push(newPack);
+        _currentPacks = packs;
+
+        try {
+            await savePacks(sb, packs);
+            renderPackCard(newPack);
+            renderAdminPackRow(newPack, sb, packs);
+            form.reset();
+            if (statusEl) statusEl.textContent = '✅ Pack creado';
+            setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+        } catch (err) {
+            console.error('Error guardando pack:', err);
+            packs.pop();
+            _currentPacks = packs;
+            if (statusEl) statusEl.textContent = '❌ Error guardando';
+            BSAlert('❌ No se pudo guardar el pack.');
+        }
+    });
+}
+
+// Retorno desde Stripe: ?pack_success=PACK_ID → modal con botón de descarga
+async function handlePackPurchaseReturn(sb) {
+    const params = new URLSearchParams(window.location.search);
+    const packId = params.get('pack_success');
+    if (!packId) return;
+
+    // Limpiar la URL para que un refresco no vuelva a disparar el modal
+    const cleanUrl = window.location.pathname + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    // Esperar a que los packs estén cargados (initPacks puede ir en paralelo)
+    let packs = _currentPacks && _currentPacks.length ? _currentPacks : await loadPacks(sb);
+    const pack = packs.find(p => p.id === packId);
+    if (!pack) {
+        BSAlert('❌ No encontramos el pack. Contacta con soporte y adjunta el recibo de Stripe.');
+        return;
+    }
+
+    const overlay = document.getElementById('bs-modal-overlay');
+    const iconEl = document.getElementById('bs-modal-icon');
+    const msgEl = document.getElementById('bs-modal-message');
+    const okBtn = /** @type {HTMLButtonElement} */ (document.getElementById('bs-modal-ok'));
+    const cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('bs-modal-cancel'));
+    if (!overlay || !iconEl || !msgEl || !okBtn) { window.open(pack.download_url, '_blank'); return; }
+
+    iconEl.textContent = '🎁';
+    msgEl.textContent = `¡Gracias por tu compra!\n\n"${pack.title}" de ${pack.artist} está listo para descargar.`;
+    okBtn.textContent = 'DESCARGAR PACK';
+    cancelBtn.style.display = 'none';
+    overlay.style.display = 'flex';
+
+    const onClick = () => {
+        window.open(pack.download_url, '_blank');
+        overlay.style.display = 'none';
+        okBtn.textContent = 'ACEPTAR';
+        okBtn.removeEventListener('click', onClick);
+    };
+    okBtn.addEventListener('click', onClick);
+}
+
+// ─── CATÁLOGO GRATUITO (descarga libre, sin login) ───────────────────────────
+
+const FREE_CATALOG_FILE = 'free_catalog.json';
+
+let _currentFreeTracks = [];
+let _freeFileAnalysis = [];
+
+async function loadFreeCatalog(sb) {
+    try {
+        const url = `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${FREE_CATALOG_FILE}?t=${Date.now()}`;
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        return await res.json();
+    } catch { return []; }
+}
+
+async function saveFreeCatalog(sb, tracks) {
+    const blob = new Blob([JSON.stringify(tracks, null, 2)], { type: 'application/json' });
+    await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(FREE_CATALOG_FILE, blob, { upsert: true, contentType: 'application/json' });
+}
+
+function renderFreeTrackRow(track) {
+    const tbody = document.getElementById('free-tracks-body');
+    if (!tbody) return;
+    if (tbody.querySelector(`tr[data-id="${track.id}"]`)) return;
+    const empty = document.getElementById('free-empty-row');
+    if (empty) empty.remove();
+
+    const tr = document.createElement('tr');
+    tr.className = 'track-row';
+    tr.setAttribute('data-id', track.id);
+    tr.setAttribute('data-title', track.title);
+    tr.setAttribute('data-artist', track.artist);
+    tr.setAttribute('data-src', track.audio_url);
+    tr.setAttribute('data-search', ((track.title || '') + ' ' + (track.artist || '')).toLowerCase());
+    tr.innerHTML = `
+        <td><button class="track-play-btn" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:1.5rem">▶</button></td>
+        <td class="font-medium">${escapeHtml(track.title)}</td>
+        <td class="text-secondary">${escapeHtml(track.artist)}</td>
+        <td class="text-secondary">${track.bpm || '—'}</td>
+        <td class="text-secondary">${track.key || '—'}</td>
+        <td><a href="${escapeHtml(track.audio_url)}" download class="track-download-btn" title="Descargar gratis" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 10px;color:#f3c948;font-size:0.8rem;letter-spacing:1px;cursor:pointer;text-decoration:none;display:inline-block">⬇ FREE</a></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function renderAdminFreeRow(track, sb, allTracks) {
+    const tbody = document.getElementById('admin-free-tbody');
+    const empty = document.getElementById('admin-free-empty');
+    if (empty) empty.remove();
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-id', track.id);
+    tr.innerHTML = `
+        <td class="font-medium">${escapeHtml(track.title)}</td>
+        <td class="text-secondary">${escapeHtml(track.artist)}</td>
+        <td class="text-secondary">${track.bpm || '—'}</td>
+        <td class="text-secondary">${track.key || '—'}</td>
+        <td><button class="delete-free-btn" title="Eliminar" style="background:none;border:1px solid rgba(255,80,80,0.3);border-radius:4px;padding:4px 10px;color:#ff5050;font-size:0.9rem;cursor:pointer">🗑️</button></td>
+    `;
+    tr.querySelector('.delete-free-btn').addEventListener('click', () => {
+        BSConfirm(`¿Eliminar "${track.title}" del catálogo gratuito?`).then(async ok => {
+            if (!ok) return;
+            // Borrar audio del storage
+            if (sb && track.audio_url) {
+                try {
+                    const bucketBase = `/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/`;
+                    const idx = track.audio_url.indexOf(bucketBase);
+                    if (idx !== -1) {
+                        const path = decodeURIComponent(track.audio_url.slice(idx + bucketBase.length).split('?')[0]);
+                        await sb.storage.from(CONFIG.STORAGE_BUCKET).remove([path]);
+                    }
+                } catch (e) { console.warn('No se pudo borrar el audio gratis:', e); }
+            }
+            const updated = allTracks.filter(t => t.id !== track.id);
+            allTracks.length = 0; updated.forEach(t => allTracks.push(t));
+            _currentFreeTracks = allTracks;
+            await saveFreeCatalog(sb, allTracks);
+            tr.remove();
+            document.querySelector(`#free-tracks-body tr[data-id="${track.id}"]`)?.remove();
+            BSAlert('✅ Pista gratis eliminada.');
+        });
+    });
+    tbody.appendChild(tr);
+}
+
+function renderFreeUploadFileList(files, analysisResults) {
+    const container = document.getElementById('free-upload-file-list');
+    if (!container) return;
+    if (!files || files.length === 0) { container.innerHTML = ''; _freeFileAnalysis = []; return; }
+    const rows = Array.from(files).map((f, i) => {
+        const { artist, title } = parseFileName(f.name);
+        const a = (analysisResults && analysisResults[i]) || {};
+        const bpmVal = a.bpm || '';
+        const keyVal = a.key || '';
+        const analyzing = !analysisResults || !analysisResults[i];
+        return `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.7rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:3px;margin-bottom:4px;flex-wrap:wrap" data-file-idx="${i}">
+            <span style="color:#f3c948;font-size:0.8rem;min-width:22px">${i + 1}.</span>
+            <span style="color:#fff;font-size:0.85rem;flex:1;min-width:120px">${escapeHtml(title)}</span>
+            <span style="color:rgba(255,255,255,0.4);font-size:0.8rem;min-width:80px">${escapeHtml(artist) || 'Sin artista'}</span>
+            <span style="color:rgba(255,255,255,0.2);font-size:0.7rem;min-width:45px">${(f.size / 1048576).toFixed(1)} MB</span>
+            <input type="number" class="free-file-bpm" data-idx="${i}" value="${bpmVal}" placeholder="${analyzing ? '...' : 'BPM'}" style="width:55px;background:rgba(255,255,255,0.06);border:1px solid rgba(243,201,72,0.3);border-radius:3px;padding:3px 6px;color:#f3c948;font-size:0.78rem;text-align:center;outline:none" />
+            <input type="text" class="free-file-key" data-idx="${i}" value="${keyVal}" placeholder="${analyzing ? '...' : 'Key'}" style="width:45px;background:rgba(255,255,255,0.06);border:1px solid rgba(243,201,72,0.3);border-radius:3px;padding:3px 6px;color:#f3c948;font-size:0.78rem;text-align:center;outline:none" />
+        </div>`;
+    }).join('');
+    container.innerHTML = `<div style="font-size:0.75rem;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin-bottom:0.4rem">${files.length} archivo${files.length > 1 ? 's' : ''} — analizando audio...</div>${rows}`;
+}
+
+async function analyzeAndRenderFreeFiles(files) {
+    _freeFileAnalysis = new Array(files.length).fill(null);
+    renderFreeUploadFileList(files, _freeFileAnalysis);
+    for (let i = 0; i < files.length; i++) {
+        const result = await analyzeAudioFile(files[i]);
+        _freeFileAnalysis[i] = result;
+        renderFreeUploadFileList(files, _freeFileAnalysis);
+    }
+}
+
+async function initFreeCatalog(sb) {
+    if (!CONFIG.SUPABASE_URL) return;
+
+    const tracks = await loadFreeCatalog(sb);
+    _currentFreeTracks = tracks;
+
+    tracks.forEach(t => {
+        renderFreeTrackRow(t);
+        renderAdminFreeRow(t, sb, tracks);
+    });
+
+    // Buscador público
+    const searchInput = document.getElementById('free-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            /** @type {any} */ const t = e.target;
+            const q = (t.value || '').toLowerCase().trim();
+            document.querySelectorAll('#free-tracks-body tr[data-search]').forEach(row => {
+                /** @type {any} */ const r = row;
+                const hay = r.getAttribute('data-search') || '';
+                r.style.display = (!q || hay.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
+    // Analizar archivos al seleccionar
+    const fileInput = /** @type {HTMLInputElement} */ (document.getElementById('free-file-input'));
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files) analyzeAndRenderFreeFiles(fileInput.files);
+        });
+    }
+
+    // Form de subida
+    const form = document.getElementById('upload-free-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = /** @type {HTMLButtonElement} */ (document.getElementById('upload-free-btn'));
+        const progressText = document.getElementById('free-upload-progress-text');
+        const files = fileInput && fileInput.files;
+        const container = document.getElementById('free-upload-file-list');
+
+        if (!files || files.length === 0) { BSAlert('⚠️ Selecciona al menos un archivo de audio.'); return; }
+
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Subiendo...';
+        btn.disabled = true;
+
+        let uploaded = 0, errors = 0;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const { artist, title } = parseFileName(file.name);
+            if (progressText) progressText.textContent = `Subiendo ${i + 1} de ${files.length}: ${title}`;
+
+            const bpmInput = container && container.querySelector(`.free-file-bpm[data-idx="${i}"]`);
+            const keyInput = container && container.querySelector(`.free-file-key[data-idx="${i}"]`);
+            /** @type {any} */ const bi = bpmInput;
+            /** @type {any} */ const ki = keyInput;
+            const fileBpm = bi ? bi.value.trim() : '';
+            const fileKey = ki ? ki.value.trim() : '';
+
+            try {
+                const safeName = file.name
+                    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                    .replace(/[^a-zA-Z0-9._-]/g, '_')
+                    .replace(/_+/g, '_');
+                const filePath = `free/${Date.now()}_${safeName}`;
+                const { error: upErr } = await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(filePath, file, { upsert: false });
+                if (upErr) throw upErr;
+
+                const { data: urlData } = sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(filePath);
+
+                const newTrack = {
+                    id: Date.now().toString() + '_' + i,
+                    title: title || file.name,
+                    artist: artist || '',
+                    bpm: fileBpm || null,
+                    key: fileKey || null,
+                    audio_url: urlData.publicUrl,
+                };
+                tracks.push(newTrack);
+                _currentFreeTracks = tracks;
+                renderFreeTrackRow(newTrack);
+                renderAdminFreeRow(newTrack, sb, tracks);
+                uploaded++;
+            } catch (err) {
+                console.error(`Error subiendo gratis ${file.name}:`, err);
+                errors++;
+            }
+        }
+
+        if (uploaded > 0) {
+            await saveFreeCatalog(sb, tracks);
+        }
+
+        if (progressText) progressText.textContent = '';
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+
+        if (errors === 0) {
+            BSAlert(`✅ ${uploaded} pista${uploaded > 1 ? 's' : ''} gratis subida${uploaded > 1 ? 's' : ''}.`);
+        } else {
+            BSAlert(`⚠️ ${uploaded} subida${uploaded > 1 ? 's' : ''}, ${errors} error${errors > 1 ? 'es' : ''}.`);
+        }
+
+        form.reset();
+        renderFreeUploadFileList(null);
+    });
 }
 
