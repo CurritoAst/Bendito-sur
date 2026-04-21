@@ -531,30 +531,9 @@ export default function App() {
                             <i className="ph ph-magnifying-glass"></i>
                             <input type="text" placeholder="Buscar artista o titulo..." className="filter-input" />
                         </div>
-                        <select className="filter-select">
-                            <option value="">Genero</option>
-                            <option value="techno">Techno</option>
-                            <option value="tech-house">Tech House</option>
-                            <option value="minimal">Minimal</option>
-                            <option value="flamenco-house">Flamenco House</option>
-                            <option value="latin-house">Latin House</option>
-                            <option value="breakbeat">Breakbeat</option>
-                        </select>
-                        <select className="filter-select">
-                            <option value="">BPM</option>
-                            <option value="120-125">120 – 125</option>
-                            <option value="126-130">126 – 130</option>
-                            <option value="130+">130+</option>
-                        </select>
-                        <select className="filter-select">
-                            <option value="">Key</option>
-                            <option value="8a">8A</option>
-                            <option value="9a">9A</option>
-                            <option value="10a">10A</option>
-                            <option value="11b">11B</option>
-                        </select>
                     </div>
                 </div>
+                <div id="library-section-tabs" className="library-section-tabs" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}></div>
 
                 <div className="library-table-container">
                     <table className="library-table">
@@ -563,7 +542,7 @@ export default function App() {
                                 <th></th>
                                 <th>Titulo</th>
                                 <th>Artista</th>
-                                <th>Genero</th>
+                                <th>Seccion</th>
                                 <th>BPM</th>
                                 <th>Key</th>
                                 <th></th>
@@ -1106,6 +1085,9 @@ export default function App() {
                     {/* === SECCIÓN CATÁLOGO === */}
                     <div id="admin-catalog" className="admin-section mt-2">
                         <div className="dashboard-section">
+                            {/* Gestor de secciones (se rellena via JS) */}
+                            <div id="admin-section-manager" style={{ marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}></div>
+
                             <h3 className="dashboard-card-title mb-3"><i className="ph ph-music-notes-plus"></i> Subir Pistas al Catálogo</h3>
                             <form id="upload-track-form" style={{ marginBottom: '2rem' }}>
                                 {/* 1. Selector de archivos múltiple */}
@@ -1121,8 +1103,10 @@ export default function App() {
                                 {/* 3. Campos compartidos: BPM, Key, Género, Acceso */}
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                        <label htmlFor="track-genre" style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Género</label>
-                                        <input type="text" id="track-genre" placeholder="Ej: Flamenco House" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }} />
+                                        <label htmlFor="track-section" style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Sección</label>
+                                        <select id="track-section" style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '3px', padding: '0.6rem 0.8rem', color: '#fff', fontSize: '0.9rem', outline: 'none' }}>
+                                            <option value="">Sin clasificar</option>
+                                        </select>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                         <label style={{ fontSize: '0.75rem', letterSpacing: '2px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Acceso</label>
@@ -1150,7 +1134,7 @@ export default function App() {
                                         <tr>
                                             <th>Título</th>
                                             <th>Artista</th>
-                                            <th>Género</th>
+                                            <th>Sección</th>
                                             <th>BPM</th>
                                             <th>Key</th>
                                             <th>Acceso</th>

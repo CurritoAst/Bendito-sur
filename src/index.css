@@ -549,6 +549,30 @@ main { padding-top: 64px; min-height: 100vh; }
 .filter-select:focus { border-color: var(--gold); }
 .filter-select option { background: var(--surface); }
 
+.library-section-tabs { padding: 0 2rem; }
+.library-section-tab {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+    padding: 0.55rem 1.2rem;
+    border-radius: 999px;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all var(--t-fast);
+}
+.library-section-tab:hover {
+    border-color: rgba(243,201,72,0.4);
+    color: #fff;
+}
+.library-section-tab.active {
+    background: rgba(243,201,72,0.12);
+    border-color: var(--gold);
+    color: var(--gold);
+}
+
 .library-table-container { overflow-x: auto; }
 
 .library-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 560px; }

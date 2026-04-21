@@ -1830,6 +1830,281 @@ export function initializeAppLogic() {
 // ─── CATALOG SYSTEM (Storage JSON — sin base de datos) ───────────────────────
 
 const CATALOG_FILE = 'catalog.json';
+const SECTIONS_FILE = 'sections.json';
+
+// Estado de secciones y tracks accesible desde todas las funciones del modulo.
+// Se rellena en initCatalog() y se actualiza por los handlers de admin.
+let _currentSections = [];
+let _currentTracks = [];
+// Seccion activa en la vista de biblioteca ('' = todas)
+let _activeSectionId = '';
+// ID virtual para tracks sin seccion asignada
+const UNASSIGNED_SECTION_ID = '__unassigned__';
+
+async function loadSections(sb) {
+    try {
+        const url = sb
+            ? sb.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(SECTIONS_FILE).data.publicUrl
+            : `${CONFIG.SUPABASE_URL}/storage/v1/object/public/${CONFIG.STORAGE_BUCKET}/${SECTIONS_FILE}`;
+        const res = await fetch(url + '?t=' + Date.now());
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+    } catch { return []; }
+}
+
+async function saveSections(sb, sections) {
+    const blob = new Blob([JSON.stringify(sections, null, 2)], { type: 'application/json' });
+    const { error } = await sb.storage.from(CONFIG.STORAGE_BUCKET).upload(SECTIONS_FILE, blob, { upsert: true, contentType: 'application/json' });
+    if (error) throw error;
+}
+
+// Devuelve el nombre legible para la seccion de un track (o "Sin clasificar")
+function getSectionNameForTrack(track) {
+    if (!track) return 'Sin clasificar';
+    if (track.sectionId) {
+        const sec = _currentSections.find(s => s.id === track.sectionId);
+        if (sec) return sec.name;
+    }
+    // Fallback para tracks antiguos que solo tienen 'genre'
+    if (track.genre) return track.genre;
+    return 'Sin clasificar';
+}
+
+// Devuelve true si el track pertenece a la seccion activa del filtro.
+// sectionId '' = mostrar todos; UNASSIGNED_SECTION_ID = solo tracks sin seccion.
+function trackMatchesActiveSection(track) {
+    if (!_activeSectionId) return true;
+    if (_activeSectionId === UNASSIGNED_SECTION_ID) {
+        return !track.sectionId || !_currentSections.some(s => s.id === track.sectionId);
+    }
+    return track.sectionId === _activeSectionId;
+}
+
+function escapeHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
+
+// Aplica el filtro de seccion activa a todas las filas de la biblioteca
+function applyLibrarySectionFilter() {
+    const rows = document.querySelectorAll('#library-tracks-body tr.track-row');
+    rows.forEach(row => {
+        const id = row.getAttribute('data-id');
+        const track = _currentTracks.find(t => t.id === id);
+        if (!track) return;
+        row.style.display = trackMatchesActiveSection(track) ? '' : 'none';
+    });
+    // Aplicar tambien el buscador si tiene texto
+    const searchInput = document.querySelector('#library-view .filter-input');
+    if (searchInput && searchInput.value) applyLibrarySearch(searchInput.value);
+}
+
+// Filtra por texto dentro de la seccion activa (busca en titulo/artista)
+function applyLibrarySearch(query) {
+    const q = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#library-tracks-body tr.track-row');
+    rows.forEach(row => {
+        const id = row.getAttribute('data-id');
+        const track = _currentTracks.find(t => t.id === id);
+        if (!track) return;
+        const inSection = trackMatchesActiveSection(track);
+        if (!inSection) { row.style.display = 'none'; return; }
+        if (!q) { row.style.display = ''; return; }
+        const title = (track.title || '').toLowerCase();
+        const artist = (track.artist || '').toLowerCase();
+        row.style.display = (title.includes(q) || artist.includes(q)) ? '' : 'none';
+    });
+}
+
+// Genera un ID unico para una seccion nueva
+function makeSectionId() {
+    return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+// Devuelve true si existe al menos un track sin seccion asignada (para mostrar el tab "Sin clasificar")
+function hasUnassignedTracks() {
+    return _currentTracks.some(t => !t.sectionId || !_currentSections.some(s => s.id === t.sectionId));
+}
+
+// Pinta los tabs de secciones en la vista de biblioteca (public user)
+function renderLibrarySectionTabs() {
+    const container = document.getElementById('library-section-tabs');
+    if (!container) return;
+    const ordered = [..._currentSections].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const pills = [
+        `<button class="library-section-tab ${_activeSectionId === '' ? 'active' : ''}" data-section-id="">Todas</button>`,
+        ...ordered.map(s => `<button class="library-section-tab ${_activeSectionId === s.id ? 'active' : ''}" data-section-id="${s.id}">${escapeHtml(s.name)}</button>`),
+    ];
+    if (hasUnassignedTracks()) {
+        pills.push(`<button class="library-section-tab ${_activeSectionId === UNASSIGNED_SECTION_ID ? 'active' : ''}" data-section-id="${UNASSIGNED_SECTION_ID}">Sin clasificar</button>`);
+    }
+    container.innerHTML = pills.join('');
+    container.querySelectorAll('.library-section-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            _activeSectionId = btn.getAttribute('data-section-id') || '';
+            container.querySelectorAll('.library-section-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            applyLibrarySectionFilter();
+        });
+    });
+}
+
+// Rellena el dropdown de secciones en el formulario de subida
+function renderUploadSectionDropdown() {
+    const select = document.getElementById('track-section');
+    if (!select) return;
+    const ordered = [..._currentSections].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const opts = [
+        `<option value="">Sin clasificar</option>`,
+        ...ordered.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`),
+    ];
+    select.innerHTML = opts.join('');
+}
+
+// Pinta el gestor de secciones en el panel de admin
+function renderAdminSectionManager(sb) {
+    const container = document.getElementById('admin-section-manager');
+    if (!container) return;
+    const ordered = [..._currentSections].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const listHtml = ordered.length === 0
+        ? `<p style="color:rgba(255,255,255,0.35);font-size:0.85rem;margin:1rem 0;letter-spacing:1px">AUN NO HAS CREADO NINGUNA SECCION</p>`
+        : `<ul class="admin-section-list" style="list-style:none;padding:0;margin:0 0 1rem 0;display:flex;flex-direction:column;gap:0.4rem">${ordered.map((s, idx) => `
+            <li data-section-id="${s.id}" style="display:flex;align-items:center;gap:0.5rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:0.5rem 0.7rem">
+                <span style="color:rgba(255,255,255,0.3);font-size:0.75rem;min-width:1.5rem">${idx + 1}.</span>
+                <input class="section-name-input" type="text" value="${escapeHtml(s.name)}" style="flex:1;background:transparent;border:none;color:#fff;font-size:0.9rem;outline:none" />
+                <button class="section-up-btn" title="Subir" ${idx === 0 ? 'disabled' : ''} style="background:none;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:2px 8px;color:#fff;cursor:${idx === 0 ? 'not-allowed' : 'pointer'};opacity:${idx === 0 ? 0.3 : 1}">▲</button>
+                <button class="section-down-btn" title="Bajar" ${idx === ordered.length - 1 ? 'disabled' : ''} style="background:none;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:2px 8px;color:#fff;cursor:${idx === ordered.length - 1 ? 'not-allowed' : 'pointer'};opacity:${idx === ordered.length - 1 ? 0.3 : 1}">▼</button>
+                <button class="section-save-btn" title="Guardar nombre" style="background:rgba(243,201,72,0.15);border:1px solid var(--gold);border-radius:3px;padding:2px 10px;color:var(--gold);cursor:pointer;font-size:0.8rem">Guardar</button>
+                <button class="section-delete-btn" title="Eliminar" style="background:none;border:1px solid rgba(255,80,80,0.3);border-radius:3px;padding:2px 10px;color:#ff5050;cursor:pointer">🗑️</button>
+            </li>`).join('')}</ul>`;
+    container.innerHTML = `
+        <div style="margin-bottom:1rem">
+            <h4 style="margin:0 0 0.7rem 0;font-size:0.85rem;letter-spacing:2px;color:rgba(255,255,255,0.5);text-transform:uppercase">Secciones del catalogo</h4>
+            <p style="color:rgba(255,255,255,0.35);font-size:0.78rem;margin:0 0 1rem 0">Crea categorias (Techno, Chill, Cinematic...) para que los usuarios naveguen por ellas. Los tracks se asignan al subirlos o desde la tabla de abajo.</p>
+            ${listHtml}
+            <form id="add-section-form" style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                <input type="text" id="new-section-name" placeholder="Nombre de la nueva seccion" required style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:0.5rem 0.7rem;color:#fff;font-size:0.9rem;outline:none" />
+                <button type="submit" class="btn btn-outline" style="border-color:var(--gold);color:var(--gold);padding:0.5rem 1rem;font-size:0.85rem"><i class="ph ph-plus"></i> Anadir</button>
+            </form>
+        </div>
+    `;
+
+    // Anadir seccion
+    const addForm = container.querySelector('#add-section-form');
+    addForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = container.querySelector('#new-section-name');
+        const name = (input?.value || '').trim();
+        if (!name) return;
+        if (_currentSections.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+            BSAlert('⚠️ Ya existe una seccion con ese nombre.');
+            return;
+        }
+        const maxOrder = _currentSections.reduce((m, s) => Math.max(m, s.order || 0), 0);
+        _currentSections.push({ id: makeSectionId(), name, order: maxOrder + 1 });
+        try {
+            await saveSections(sb, _currentSections);
+            refreshAllSectionUIs(sb);
+        } catch (err) {
+            console.error('Error guardando seccion:', err);
+            BSAlert('❌ No se pudo guardar la seccion.');
+        }
+    });
+
+    // Renombrar, mover y borrar
+    container.querySelectorAll('li[data-section-id]').forEach(li => {
+        const id = li.getAttribute('data-section-id');
+        const section = _currentSections.find(s => s.id === id);
+        if (!section) return;
+        const nameInput = li.querySelector('.section-name-input');
+
+        li.querySelector('.section-save-btn')?.addEventListener('click', async () => {
+            const newName = (nameInput?.value || '').trim();
+            if (!newName) { BSAlert('⚠️ El nombre no puede estar vacio.'); return; }
+            if (newName === section.name) return;
+            if (_currentSections.some(s => s.id !== section.id && s.name.toLowerCase() === newName.toLowerCase())) {
+                BSAlert('⚠️ Ya existe otra seccion con ese nombre.'); return;
+            }
+            section.name = newName;
+            try {
+                await saveSections(sb, _currentSections);
+                refreshAllSectionUIs(sb);
+                BSAlert('✅ Seccion renombrada.');
+            } catch (err) {
+                console.error(err);
+                BSAlert('❌ No se pudo renombrar.');
+            }
+        });
+
+        li.querySelector('.section-delete-btn')?.addEventListener('click', () => {
+            const usedBy = _currentTracks.filter(t => t.sectionId === section.id).length;
+            const msg = usedBy > 0
+                ? `¿Borrar la seccion "${section.name}"? ${usedBy} track(s) quedaran como "Sin clasificar".`
+                : `¿Borrar la seccion "${section.name}"?`;
+            BSConfirm(msg).then(async ok => {
+                if (!ok) return;
+                // Desvincular tracks
+                _currentTracks.forEach(t => { if (t.sectionId === section.id) t.sectionId = null; });
+                _currentSections = _currentSections.filter(s => s.id !== section.id);
+                try {
+                    await Promise.all([saveSections(sb, _currentSections), saveCatalog(sb, _currentTracks)]);
+                    refreshAllSectionUIs(sb);
+                } catch (err) {
+                    console.error(err);
+                    BSAlert('❌ No se pudo borrar la seccion.');
+                }
+            });
+        });
+
+        li.querySelector('.section-up-btn')?.addEventListener('click', async () => {
+            const ord = [..._currentSections].sort((a, b) => (a.order || 0) - (b.order || 0));
+            const idx = ord.findIndex(s => s.id === section.id);
+            if (idx <= 0) return;
+            const prev = ord[idx - 1];
+            const tmp = section.order; section.order = prev.order; prev.order = tmp;
+            try { await saveSections(sb, _currentSections); refreshAllSectionUIs(sb); }
+            catch (err) { console.error(err); BSAlert('❌ No se pudo reordenar.'); }
+        });
+
+        li.querySelector('.section-down-btn')?.addEventListener('click', async () => {
+            const ord = [..._currentSections].sort((a, b) => (a.order || 0) - (b.order || 0));
+            const idx = ord.findIndex(s => s.id === section.id);
+            if (idx === -1 || idx >= ord.length - 1) return;
+            const next = ord[idx + 1];
+            const tmp = section.order; section.order = next.order; next.order = tmp;
+            try { await saveSections(sb, _currentSections); refreshAllSectionUIs(sb); }
+            catch (err) { console.error(err); BSAlert('❌ No se pudo reordenar.'); }
+        });
+    });
+}
+
+// Vuelve a pintar todas las UIs que dependen de la lista de secciones
+function refreshAllSectionUIs(sb) {
+    // Si la seccion activa en el filtro ya no existe, volver a "Todas"
+    if (_activeSectionId && _activeSectionId !== UNASSIGNED_SECTION_ID && !_currentSections.some(s => s.id === _activeSectionId)) {
+        _activeSectionId = '';
+    }
+    renderLibrarySectionTabs();
+    renderUploadSectionDropdown();
+    renderAdminSectionManager(sb);
+    // Repintar tabla admin (para actualizar los selects por fila)
+    const adminTbody = document.getElementById('admin-catalog-tbody');
+    if (adminTbody) {
+        adminTbody.innerHTML = '<tr id="admin-catalog-empty"><td colspan="7" style="text-align:center;padding:2rem;color:rgba(255,255,255,0.25);font-size:0.85rem;letter-spacing:2px">SIN PISTAS AÚN</td></tr>';
+        _currentTracks.forEach(t => renderAdminCatalogRow(t, sb, _currentTracks));
+    }
+    // Repintar tags de seccion en la biblioteca
+    _currentTracks.forEach(t => {
+        const libRow = document.querySelector(`#library-tracks-body tr[data-id="${t.id}"]`);
+        if (libRow) {
+            const tagEl = libRow.querySelector('.genre-tag');
+            if (tagEl) tagEl.textContent = getSectionNameForTrack(t);
+        }
+    });
+    applyLibrarySectionFilter();
+}
 
 async function loadCatalog(sb) {
     try {
@@ -1861,14 +2136,18 @@ function renderTrackRow(track) {
     tr.setAttribute('data-artist', track.artist);
     tr.setAttribute('data-src', track.audio_url);
     tr.setAttribute('data-id', track.id);
+    tr.setAttribute('data-section-id', track.sectionId || '');
+    // Ocultar si no coincide con la seccion activa del filtro
+    if (!trackMatchesActiveSection(track)) tr.style.display = 'none';
     const downloadBtn = track.locked
         ? `<button class="btn-icon locked-btn" title="Solo Elite" style="background:rgba(243,201,72,0.15);border:1px solid #f3c948;border-radius:4px;padding:4px 8px;color:#f3c948;font-size:0.75rem;letter-spacing:1px;cursor:pointer">🔒 ELITE</button>`
         : `<button class="track-download-btn" title="Descargar WAV" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:4px 10px;color:#fff;font-size:0.8rem;letter-spacing:1px;cursor:pointer">⬇ WAV</button>`;
+    const sectionLabel = getSectionNameForTrack(track);
     tr.innerHTML = `
         <td><button class="track-play-btn" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:1.5rem">▶</button></td>
         <td class="font-medium">${track.title}</td>
         <td class="text-secondary">${track.artist}</td>
-        <td><span class="genre-tag">${track.genre || '—'}</span></td>
+        <td><span class="genre-tag">${sectionLabel}</span></td>
         <td class="text-secondary">${track.bpm || '—'}</td>
         <td class="text-secondary">${track.key || '—'}</td>
         <td>${downloadBtn}</td>`;
@@ -1881,14 +2160,43 @@ function renderAdminCatalogRow(track, sb, allTracks) {
     if (emptyRow) emptyRow.remove();
     const tr = document.createElement('tr');
     tr.setAttribute('data-id', track.id);
+    // Dropdown de seccion por fila: permite reasignar un track a otra seccion sin reeditar
+    const currentSectionId = track.sectionId || '';
+    const sectionOptions = [
+        `<option value="">Sin clasificar</option>`,
+        ..._currentSections.map(s => `<option value="${s.id}" ${s.id === currentSectionId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`)
+    ].join('');
     tr.innerHTML = `
         <td class="font-medium">${track.title}</td>
         <td class="text-secondary">${track.artist}</td>
-        <td><span class="genre-tag">${track.genre || '—'}</span></td>
+        <td>
+            <select class="track-section-select" data-id="${track.id}" style="background:#111;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:0.3rem 0.5rem;color:#fff;font-size:0.82rem;max-width:160px">
+                ${sectionOptions}
+            </select>
+        </td>
         <td class="text-secondary">${track.bpm || '—'}</td>
         <td class="text-secondary">${track.key || '—'}</td>
         <td>${track.locked ? '<span class="format-badge">Elite</span>' : '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Libre</span>'}</td>
         <td><button class="delete-track-btn" title="Eliminar" style="background:none;border:1px solid rgba(255,80,80,0.3);border-radius:4px;padding:4px 10px;color:#ff5050;font-size:0.9rem;cursor:pointer">🗑️</button></td>`;
+    // Cambio de seccion inline: actualiza el track y persiste catalog.json
+    tr.querySelector('.track-section-select').addEventListener('change', async (e) => {
+        const newSectionId = e.target.value || null;
+        track.sectionId = newSectionId;
+        try {
+            await saveCatalog(sb, allTracks);
+            // Refrescar la fila de biblioteca para que se vea el cambio
+            const libRow = document.querySelector(`#library-tracks-body tr[data-id="${track.id}"]`);
+            if (libRow) {
+                libRow.setAttribute('data-section-id', newSectionId || '');
+                const tagEl = libRow.querySelector('.genre-tag');
+                if (tagEl) tagEl.textContent = getSectionNameForTrack(track);
+                libRow.style.display = trackMatchesActiveSection(track) ? '' : 'none';
+            }
+        } catch (err) {
+            console.error('Error guardando cambio de seccion:', err);
+            BSAlert('❌ No se pudo guardar el cambio de seccion.');
+        }
+    });
     tr.querySelector('.delete-track-btn').addEventListener('click', () => {
         BSConfirm('¿Eliminar esta pista del catálogo?').then(async ok => {
             if (!ok) return;
@@ -2137,8 +2445,27 @@ async function analyzeAndRenderFiles(files) {
 async function initCatalog(supabaseClient) {
     if (!CONFIG.SUPABASE_URL) return;
 
-    // Cargar catálogo desde catalog.json
-    const tracks = await loadCatalog(supabaseClient);
+    // Cargar secciones y catálogo en paralelo
+    const [sections, tracks] = await Promise.all([
+        loadSections(supabaseClient),
+        loadCatalog(supabaseClient),
+    ]);
+    _currentSections = sections;
+    _currentTracks = tracks;
+
+    // Pintar la UI de secciones (tabs de biblioteca, gestor admin, dropdown upload)
+    renderLibrarySectionTabs();
+    renderAdminSectionManager(supabaseClient);
+    renderUploadSectionDropdown();
+
+    // Buscador de la biblioteca: filtra dentro de la seccion activa
+    const searchInput = document.querySelector('#library-view .filter-input');
+    if (searchInput && !searchInput.dataset.bsWired) {
+        searchInput.addEventListener('input', (e) => applyLibrarySearch((e.target).value));
+        searchInput.dataset.bsWired = '1';
+    }
+
+    // Pintar tracks respetando el filtro activo
     tracks.forEach(t => {
         renderTrackRow(t);
         renderAdminCatalogRow(t, supabaseClient, tracks);
@@ -2163,7 +2490,8 @@ async function initCatalog(supabaseClient) {
 
         if (!files || files.length === 0) { BSAlert('⚠️ Selecciona al menos un archivo de audio.'); return; }
 
-        const genre = document.getElementById('track-genre').value.trim();
+        const sectionSelect = document.getElementById('track-section');
+        const sectionId = sectionSelect ? (sectionSelect.value || null) : null;
         const locked = document.getElementById('track-locked').value === 'true';
 
         const originalText = btn.innerHTML;
@@ -2200,13 +2528,14 @@ async function initCatalog(supabaseClient) {
                     id: Date.now().toString() + '_' + i,
                     title: title || file.name,
                     artist: artist || '',
-                    genre,
+                    sectionId,
                     bpm: fileBpm || null,
                     key: fileKey || null,
                     locked,
                     audio_url: urlData.publicUrl
                 };
                 tracks.push(newTrack);
+                _currentTracks = tracks;
                 renderTrackRow(newTrack);
                 renderAdminCatalogRow(newTrack, supabaseClient, tracks);
                 uploaded++;
