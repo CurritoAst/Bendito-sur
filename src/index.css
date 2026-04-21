@@ -22,8 +22,17 @@
     --dim:      #302318;
 
     --gold:     #f3c948;
-    --gold-l:   #f3c948;
+    --gold-l:   #ffd85a;
+    --gold-d:   #c89b1a;
+    --amber:    #d48b0a;
     --red:      #C02830;
+    --red-l:    #e64050;
+
+    --gold-grad:     linear-gradient(135deg, #ffd85a 0%, #f3c948 45%, #d48b0a 100%);
+    --gold-grad-soft: linear-gradient(135deg, rgba(255,216,90,0.15) 0%, rgba(212,139,10,0.05) 100%);
+    --red-gold-grad: linear-gradient(135deg, #C02830 0%, #d48b0a 60%, #f3c948 100%);
+    --gold-glow:     0 0 24px rgba(243,201,72,0.28);
+    --gold-glow-sm:  0 0 12px rgba(243,201,72,0.22);
 
     --border:   #221610;
     --border-l: #362618;
@@ -1333,3 +1342,262 @@ main { padding-top: 64px; min-height: 100vh; }
 
 .admin-section { display: none; animation: fadeIn 0.3s ease; }
 .admin-section.active { display: block; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   COLOR PASS — aprovecha la paleta (dorado/amber/rojo) con gradientes,
+   glows sutiles y acentos para que la web deje de sentirse tan plana.
+   Solo añade capa visual; no altera estructura ni comportamiento.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Botón primario: gradiente dorado con glow al hover */
+.btn-primary {
+    background: var(--gold-grad);
+    color: #1a1208;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(212,139,10,0.25);
+    transition: transform var(--t-fast), box-shadow var(--t-fast), filter var(--t-fast);
+}
+.btn-primary:hover {
+    background: var(--gold-grad);
+    filter: brightness(1.08);
+    box-shadow: 0 6px 22px rgba(243,201,72,0.45), var(--gold-glow);
+    transform: translateY(-2px);
+}
+
+/* Botón outline: glow al hover */
+.btn-outline:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow: var(--gold-glow-sm);
+}
+
+/* Hero — acentuar el dorado del "SUR." */
+.hero-title em {
+    -webkit-text-stroke: 1.5px var(--gold);
+    text-shadow: 0 0 30px rgba(243,201,72,0.18);
+}
+.sur-strip span.hl {
+    background: var(--gold-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px rgba(243,201,72,0.3));
+}
+
+/* Stats del hero — números con gradiente y leve glow */
+.hero-stat-num span,
+.stat-value {
+    background: var(--gold-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 6px rgba(243,201,72,0.22));
+}
+
+/* Navegación — subrayado con gradiente */
+.nav-item::after {
+    background: var(--gold-grad) !important;
+    height: 2px;
+    box-shadow: 0 0 8px rgba(243,201,72,0.5);
+}
+
+/* Benefit numbers — más presentes con gradiente */
+.benefit-num {
+    background: var(--gold-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.benefit-row:hover {
+    background: linear-gradient(90deg, rgba(243,201,72,0.04) 0%, rgba(17,13,8,0) 80%);
+}
+
+/* Dashboard cards — borde superior dorado sutil + fondo ligeramente elevado */
+.dashboard-card {
+    position: relative;
+    background: linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
+    border: 1px solid var(--border-l);
+    overflow: hidden;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.dashboard-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--gold-grad);
+    opacity: 0.45;
+    transition: opacity var(--t-fast);
+}
+.dashboard-card:hover {
+    border-color: rgba(243,201,72,0.2);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.4), var(--gold-glow-sm);
+}
+.dashboard-card:hover::before { opacity: 1; }
+
+/* Sub-plan name — gradiente sobre el texto grande */
+.sub-plan {
+    background: var(--gold-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+}
+
+/* Status badges por plan — cada uno con su color */
+.status-badge {
+    border: 1px solid transparent;
+    transition: all var(--t-fast);
+}
+.status-badge.active {
+    background: var(--gold-grad-soft);
+    color: var(--gold);
+    border-color: rgba(243,201,72,0.35);
+    box-shadow: 0 0 0 0 transparent, inset 0 0 12px rgba(243,201,72,0.08);
+}
+/* Badge Elite — tonos rojo-dorado */
+.status-badge[data-plan="elite"],
+.status-badge.elite {
+    background: linear-gradient(135deg, rgba(192,40,48,0.15) 0%, rgba(243,201,72,0.12) 100%);
+    color: var(--gold-l);
+    border-color: rgba(192,40,48,0.4);
+}
+
+/* Pricing — card Elite (featured) con borde superior de gradiente rojo-dorado */
+.pricing-col.featured {
+    position: relative;
+    background: linear-gradient(180deg, rgba(243,201,72,0.04) 0%, var(--bg-alt) 60%);
+}
+.pricing-col.featured::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--red-gold-grad);
+    box-shadow: 0 0 16px rgba(243,201,72,0.3);
+}
+.pricing-col.featured .pricing-plan-name {
+    background: var(--gold-grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.pricing-col:first-child {
+    position: relative;
+}
+.pricing-col:first-child::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, rgba(243,201,72,0.5) 50%, transparent 100%);
+}
+.pricing-col:hover {
+    transition: transform var(--t-mid);
+    transform: translateY(-4px);
+}
+
+/* Filter group (buscador biblioteca) — focus dorado con glow */
+.filter-group:focus-within {
+    border-color: var(--gold);
+    box-shadow: var(--gold-glow-sm);
+}
+
+/* Section tabs — activo con gradiente real + glow */
+.library-section-tab.active {
+    background: var(--gold-grad);
+    color: #1a1208;
+    border-color: transparent;
+    font-weight: 700;
+    box-shadow: 0 4px 14px rgba(212,139,10,0.35), inset 0 0 0 1px rgba(255,216,90,0.4);
+}
+
+/* Genre-tag (etiqueta de sección) en biblioteca — pill dorado suave */
+.genre-tag {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    background: var(--gold-grad-soft);
+    color: var(--gold-l);
+    border: 1px solid rgba(243,201,72,0.22);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Play button en tabla — glow al hover */
+.track-play-btn { transition: color var(--t-fast), text-shadow var(--t-fast), transform var(--t-fast); }
+.track-play-btn:hover {
+    color: var(--gold);
+    text-shadow: 0 0 12px rgba(243,201,72,0.6);
+    transform: scale(1.15);
+}
+
+/* Locked/Elite button (candado dorado) — más rico */
+.locked-btn {
+    background: linear-gradient(135deg, rgba(192,40,48,0.12) 0%, rgba(243,201,72,0.18) 100%) !important;
+    border-color: var(--gold) !important;
+    box-shadow: inset 0 0 0 1px rgba(243,201,72,0.2);
+}
+
+/* Download btn en tabla — gradiente sutil */
+.track-download-btn {
+    background: rgba(255,255,255,0.06) !important;
+    transition: all var(--t-fast);
+}
+.track-download-btn:hover {
+    background: var(--gold-grad) !important;
+    color: #1a1208 !important;
+    border-color: transparent !important;
+    box-shadow: var(--gold-glow-sm);
+}
+
+/* Admin tabs activos — refuerzo visual */
+.admin-tab-btn.active {
+    background: var(--gold-grad-soft);
+    border-color: rgba(243,201,72,0.4);
+    box-shadow: inset 0 -2px 0 0 var(--gold);
+}
+
+/* Logo — pequeño glow dorado en el icono */
+.logo i {
+    color: var(--gold);
+    filter: drop-shadow(0 0 6px rgba(243,201,72,0.4));
+}
+
+/* Section title subrayado gradiente */
+.dashboard-card-title {
+    position: relative;
+}
+.dashboard-card-title i {
+    color: var(--gold);
+    filter: drop-shadow(0 0 4px rgba(243,201,72,0.35));
+}
+
+/* Pricing discount pills (los -10%, -15%, etc.) ya usan var(--gold); añadimos glow */
+.pricing-col span[style*="--gold"] {
+    text-shadow: 0 0 6px rgba(243,201,72,0.3);
+}
+
+/* Hero ring — añadir un leve resplandor dorado */
+.hero-ring-wrap::after {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle, rgba(243,201,72,0.12) 0%, transparent 60%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Auth view (login/register) — borde dorado sutil en los paneles */
+.auth-form {
+    position: relative;
+}
+.auth-form::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(243,201,72,0.4), transparent);
+}
